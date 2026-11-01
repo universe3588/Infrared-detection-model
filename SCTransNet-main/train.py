@@ -14,8 +14,10 @@ from torch.utils.tensorboard import SummaryWriter
 from model.SCTransNet import SCTransNet as SCTransNet
 
 parser = argparse.ArgumentParser(description="PyTorch BasicIRSTD train")
-parser.add_argument("--model_names", default=['SCTransNet'], type=list, help="'ACM', 'ALCNet', 'DNANet', 'ISNet', 'UIUNet', 'RDIAN', 'RISTDnet'")
-parser.add_argument("--dataset_names", default=['SIRST3'], type=list)
+parser.add_argument("--model_names", default="SCTransNet", type=str,
+                    help="comma-separated model names, e.g. SCTransNet")
+parser.add_argument("--dataset_names", default="NUAA-SIRST,NUDT-SIRST,IRSTD-1k,SIRST-V2", type=str,
+                    help="comma-separated datasets under dataset_dir")
 # SIRST3： NUAA NUDT IRSTD-1K
 parser.add_argument("--optimizer_name", default='Adam', type=str, help="optimizer name: AdamW, Adam, Adagrad, SGD")
 parser.add_argument("--epochs", default=1000, type=int, help="optimizer name: AdamW, Adam, Adagrad, SGD")
@@ -23,7 +25,7 @@ parser.add_argument("--begin_test", default=500, type=int)
 parser.add_argument("--every_test", default=1, type=int)
 parser.add_argument("--every_save_pth", default=1000, type=int)
 parser.add_argument("--every_print", default=10, type=int)
-parser.add_argument("--dataset_dir", default=r'./datasets')
+parser.add_argument("--dataset_dir", default=r'../RDANet-main/datasets')
 parser.add_argument("--batchSize", type=int, default=16, help="Training batch sizse")
 parser.add_argument("--patchSize", type=int, default=256, help="Training patch size")
 parser.add_argument("--save", default=r'./log', type=str, help="Save path of checkpoints")
@@ -33,9 +35,13 @@ parser.add_argument("--threads", type=int, default=0, help="Number of threads fo
 parser.add_argument("--threshold", type=float, default=0.5, help="Threshold for test")
 parser.add_argument("--seed", type=int, default=42, help="Threshold for test")
 parser.add_argument("--resume", default=False, type=list, help="Resume from exisiting checkpoints (default: None)")
+parser.add_argument("--gpus", default="0", type=str)
 
 global opt
 opt = parser.parse_args()
+opt.model_names = [x.strip() for x in str(opt.model_names).split(',') if x.strip()]
+opt.dataset_names = [x.strip() for x in str(opt.dataset_names).split(',') if x.strip()]
+os.environ["CUDA_VISIBLE_DEVICES"] = str(opt.gpus)
 
 seed_pytorch(opt.seed)
 

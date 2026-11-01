@@ -5,14 +5,54 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
 
+def _strip_stem(name):
+    name = name.strip()
+    if not name:
+        return ''
+    low = name.lower()
+    if low.endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+        name = os.path.splitext(name)[0]
+    return name
+
+
+def _read_split_list(dataset_dir, dataset_name, split):
+    """
+    Prefer RDANet flat layout:
+      train -> trainval.txt
+      test  -> test.txt
+    Fallback to SCTransNet original:
+      img_idx/train_<name>.txt / test_<name>.txt
+    """
+    if split == 'train':
+        candidates = [
+            os.path.join(dataset_dir, 'trainval.txt'),
+            os.path.join(dataset_dir, 'img_idx', 'train_' + dataset_name + '.txt'),
+            os.path.join(dataset_dir, 'img_idx', 'trainval.txt'),
+        ]
+    else:
+        candidates = [
+            os.path.join(dataset_dir, 'test.txt'),
+            os.path.join(dataset_dir, 'img_idx', 'test_' + dataset_name + '.txt'),
+        ]
+    for path in candidates:
+        if os.path.isfile(path):
+            with open(path, 'r') as f:
+                names = [_strip_stem(x) for x in f.read().splitlines()]
+            names = [x for x in names if x]
+            print('[split] %s <- %s (%d)' % (split, path, len(names)))
+            return names
+    raise FileNotFoundError(
+        'Cannot find %s split under %s (tried trainval/test and img_idx)' % (split, dataset_dir)
+    )
+
+
 class TrainSetLoader(Dataset):
     def __init__(self, dataset_dir, dataset_name, patch_size, img_norm_cfg=None):
         super(TrainSetLoader).__init__()
         self.dataset_name = dataset_name
         self.dataset_dir = dataset_dir + '/' + dataset_name
         self.patch_size = patch_size
-        with open(self.dataset_dir + '/img_idx/train_' + dataset_name + '.txt', 'r') as f:
-            self.train_list = f.read().splitlines()
+        self.train_list = _read_split_list(self.dataset_dir, dataset_name, 'train')
         if img_norm_cfg == None:
             self.img_norm_cfg = get_img_norm_cfg(dataset_name, dataset_dir)
         else:
@@ -60,8 +100,7 @@ class TrainSetLoader02(Dataset):
         self.dataset_name = dataset_name
         self.dataset_dir = dataset_dir + '/' + dataset_name
         self.patch_size = patch_size
-        with open(self.dataset_dir + '/img_idx/train_' + dataset_name + '.txt', 'r') as f:
-            self.train_list = f.read().splitlines()
+        self.train_list = _read_split_list(self.dataset_dir, dataset_name, 'train')
         if img_norm_cfg == None:
             self.img_norm_cfg = get_img_norm_cfg(dataset_name, dataset_dir)
         else:
@@ -110,8 +149,7 @@ class TrainSetLoader03(Dataset):
         self.dataset_name = dataset_name
         self.dataset_dir = dataset_dir + '/' + dataset_name
         self.patch_size = patch_size
-        with open(self.dataset_dir + '/img_idx/train_' + dataset_name + '.txt', 'r') as f:
-            self.train_list = f.read().splitlines()
+        self.train_list = _read_split_list(self.dataset_dir, dataset_name, 'train')
         if img_norm_cfg == None:
             self.img_norm_cfg = get_img_norm_cfg(dataset_name, dataset_dir)
         else:
@@ -160,8 +198,7 @@ class TrainSetLoader04(Dataset):
         self.dataset_name = dataset_name
         self.dataset_dir = dataset_dir + '/' + dataset_name
         self.patch_size = patch_size
-        with open(self.dataset_dir + '/img_idx/train_' + dataset_name + '.txt', 'r') as f:
-            self.train_list = f.read().splitlines()
+        self.train_list = _read_split_list(self.dataset_dir, dataset_name, 'train')
         if img_norm_cfg == None:
             self.img_norm_cfg = get_img_norm_cfg(dataset_name, dataset_dir)
         else:
@@ -207,9 +244,7 @@ class TestSetLoader(Dataset):
     def __init__(self, dataset_dir, train_dataset_name, test_dataset_name, img_norm_cfg=None):
         super(TestSetLoader).__init__()
         self.dataset_dir = dataset_dir + '/' + test_dataset_name
-        with open(self.dataset_dir + '/img_idx/test_' + test_dataset_name + '.txt', 'r') as f:
-        # with open(r'D:\05TGARS\Upload\datasets\SIRST3\img_idx\val.txt', 'r') as f:
-            self.test_list = f.read().splitlines()
+        self.test_list = _read_split_list(self.dataset_dir, test_dataset_name, 'test')
         if img_norm_cfg == None:
             self.img_norm_cfg = get_img_norm_cfg(train_dataset_name, dataset_dir)
         else:
@@ -254,8 +289,7 @@ class EvalSetLoader(Dataset):
         self.mask_pred_dir = mask_pred_dir
         self.test_dataset_name = test_dataset_name
         self.model_name = model_name
-        with open(self.dataset_dir + '/img_idx/test_' + test_dataset_name + '.txt', 'r') as f:
-            self.test_list = f.read().splitlines()
+        self.test_list = _read_split_list(self.dataset_dir, test_dataset_name, 'test')
 
     def __getitem__(self, idx):
         mask_pred = Image.open(

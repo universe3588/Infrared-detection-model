@@ -27,8 +27,14 @@ class IRSTD_Dataset(Data.Dataset):
 
         self.names = []
         with open(self.list_dir, 'r') as f:
-            self.names += [line.strip() for line in f.readlines()]
-
+            for line in f:
+                name = line.strip()
+                if not name:
+                    continue
+                # 允许 txt 里带 .png/.bmp 后缀
+                if name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+                    name = osp.splitext(name)[0]
+                self.names.append(name)
 
         self.mode = mode
         self.crop_size = args.crop_size
@@ -38,13 +44,20 @@ class IRSTD_Dataset(Data.Dataset):
             transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
         ])
 
+    def _resolve_path(self, folder, stem):
+        for ext in ('.png', '.bmp', '.jpg', '.PNG', '.BMP'):
+            p = osp.join(folder, stem + ext)
+            if osp.isfile(p):
+                return p
+        raise FileNotFoundError('missing %s/%s' % (folder, stem))
+
     def __getitem__(self, i):
         name = self.names[i]
-        img_path = osp.join(self.imgs_dir, name+'.png')
-        label_path = osp.join(self.label_dir, name+'.png')
+        img_path = self._resolve_path(self.imgs_dir, name)
+        label_path = self._resolve_path(self.label_dir, name)
 
         img = Image.open(img_path).convert('RGB')
-        mask = Image.open(label_path)
+        mask = Image.open(label_path).convert('L')
 
         if self.mode == 'train':
             img, mask = self._sync_transform(img, mask)

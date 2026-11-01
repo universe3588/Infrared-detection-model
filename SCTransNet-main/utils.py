@@ -115,9 +115,11 @@ def get_img_norm_cfg(dataset_name, dataset_dir):
         img_norm_cfg = dict(mean=101.06385040283203, std=34.619606018066406)
     elif dataset_name == 'NUDT-SIRST':
         img_norm_cfg = dict(mean=107.80905151367188, std=33.02274703979492)
-    elif dataset_name == 'IRSTD-1K':
+    elif dataset_name in ('IRSTD-1K', 'IRSTD-1k'):
+        # RDANet 目录名为 IRSTD-1k；原仓库写的是 IRSTD-1K
         img_norm_cfg = dict(mean=87.4661865234375, std=39.71953201293945)
-    elif dataset_name == 'SIRST2':
+    elif dataset_name in ('SIRST-V2', 'SIRST2'):
+        # SIRST-V2：无官方预设时复用 NUAA 统计
         img_norm_cfg = dict(mean=101.06385040283203, std=34.619606018066406)
     elif dataset_name == 'SIRST3':
         img_norm_cfg = dict(mean=101.06385040283203, std=34.619606018066406)
@@ -134,22 +136,41 @@ def get_img_norm_cfg(dataset_name, dataset_dir):
     elif dataset_name == 'IRDST-real':
         img_norm_cfg = {'mean': 101.54053497314453, 'std': 56.49856185913086}
     else:
-        with open(dataset_dir + '/' + dataset_name + '/img_idx/train_' + dataset_name + '.txt', 'r') as f:
-            train_list = f.read().splitlines()
-        with open(dataset_dir + '/' + dataset_name + '/img_idx/test_' + dataset_name + '.txt', 'r') as f:
-            test_list = f.read().splitlines()
+        root = dataset_dir + '/' + dataset_name
+        train_candidates = [
+            root + '/trainval.txt',
+            root + '/img_idx/train_' + dataset_name + '.txt',
+        ]
+        test_candidates = [
+            root + '/test.txt',
+            root + '/img_idx/test_' + dataset_name + '.txt',
+        ]
+        train_list, test_list = [], []
+        for p in train_candidates:
+            if os.path.isfile(p):
+                with open(p, 'r') as f:
+                    train_list = [x.strip() for x in f.read().splitlines() if x.strip()]
+                break
+        for p in test_candidates:
+            if os.path.isfile(p):
+                with open(p, 'r') as f:
+                    test_list = [x.strip() for x in f.read().splitlines() if x.strip()]
+                break
         img_list = train_list + test_list
-        img_dir = dataset_dir + '/' + dataset_name + '/images/'
+        img_dir = root + '/images/'
         mean_list = []
         std_list = []
         for img_pth in img_list:
+            stem = img_pth
+            if stem.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp')):
+                stem = os.path.splitext(stem)[0]
             try:
-                img = Image.open((img_dir + img_pth).replace('//', '/') + '.png').convert('I')
-            except:
+                img = Image.open((img_dir + stem).replace('//', '/') + '.png').convert('I')
+            except Exception:
                 try:
-                    img = Image.open((img_dir + img_pth).replace('//', '/') + '.jpg').convert('I')
-                except:
-                    img = Image.open((img_dir + img_pth).replace('//', '/') + '.bmp').convert('I')
+                    img = Image.open((img_dir + stem).replace('//', '/') + '.jpg').convert('I')
+                except Exception:
+                    img = Image.open((img_dir + stem).replace('//', '/') + '.bmp').convert('I')
             img = np.array(img, dtype=np.float32)
             mean_list.append(img.mean())
             std_list.append(img.std())

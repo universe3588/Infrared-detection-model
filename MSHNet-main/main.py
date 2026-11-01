@@ -20,7 +20,7 @@ def parse_args():
     #
     parser = ArgumentParser(description='Implement of model')
 
-    parser.add_argument('--dataset-dir', type=str, default='/dataset/IRSTD-1k')
+    parser.add_argument('--dataset-dir', type=str, default='../RDANet-main/datasets/IRSTD-1k')
     parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--epochs', type=int, default=400)
     parser.add_argument('--lr', type=float, default=0.05)
@@ -32,7 +32,9 @@ def parse_args():
     parser.add_argument('--if-checkpoint', type=bool, default=False)
 
     parser.add_argument('--mode', type=str, default='train')
-    parser.add_argument('--weight-path', type=str, default='/MSHNet/weight/IRSTD-1k_weight.tar')
+    parser.add_argument('--weight-path', type=str, default='./weight/IRSTD-1k_weight.tar')
+    parser.add_argument('--save-root', type=str, default='./weight',
+                        help='目录下按时间戳创建子文件夹保存 weight.pkl / checkpoint.pkl')
 
     args = parser.parse_args()
     return args
@@ -83,9 +85,11 @@ class Trainer(object):
                 self.best_iou = checkpoint['iou']
                 self.save_folder = check_folder
             else:
-                self.save_folder = '/MSHNet/weight/MSHNet-%s'%(time.strftime('%Y-%m-%d-%H-%M-%S',time.localtime(time.time())))
-                if not osp.exists(self.save_folder):
-                    os.mkdir(self.save_folder)
+                ds_tag = osp.basename(osp.normpath(args.dataset_dir))
+                stamp = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
+                self.save_folder = osp.join(args.save_root, 'MSHNet-%s-%s' % (ds_tag, stamp))
+                os.makedirs(self.save_folder, exist_ok=True)
+                print('[save_folder]', self.save_folder)
         if args.mode=='test':
           
             weight = torch.load(args.weight_path)
