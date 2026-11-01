@@ -1,0 +1,2 @@
+time,rknn,rknn_mb,input_dims,core_mask,warmup,iters,latency_mean_ms,latency_std_ms,latency_p50_ms,latency_p90_ms,latency_p99_ms,fps,MemAvailable_before_kB,MemAvailable_after_kB,MemTotal_kB,Cached_after_kB,npu_load_before,npu_load_after,api,drv
+2020-04-02T07:55:13,/userdata/dnanet_bench/teacher_nuaa.rknn,14.61,"[1, 256, 256, 3]",7,30,200,1060.835,13.041,1060.181,1079.321,1090.428,0.94,3088988,3089168,3744412,609604,"NPU load:  Core0: 34%, Core1: 18%, Core2: 18%,","NPU load:  Core0: 35%, Core1: 19%, Core2: 19%,",2.5.0 (74ea630ce8@2026-09-30T09:41:17),0.7.2

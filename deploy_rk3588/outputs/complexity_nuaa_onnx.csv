@@ -1,0 +1,4 @@
+name,path,file_mb,params,params_M,macs,macs_G,flops,flops_G,conv_counted,conv_skipped,method
+teacher,D:\Desktop\红外检测模型\deploy_rk3588\outputs\teacher\teacher_nuaa.onnx,18.019,4687941,4.6879,13926958464,13.927,27853916928,27.8539,203,0,onnx_initializer+conv_macs
+student,D:\Desktop\红外检测模型\deploy_rk3588\outputs\student_nuaa.onnx,4.463,1134256,1.1343,6460468280,6.4605,12920936560,12.9209,203,0,onnx_initializer+conv_macs
+delta_student_vs_teacher,,-13.556,-3553685,-3.5536,-7466490184,-7.4665,-14932980368,-14.933,,,params%=-75.80; flops%=-53.61
