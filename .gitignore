@@ -3,3 +3,26 @@
 *.token
 .env
 .env.*
+# ===== AutoDL / 训练产物（勿提交）=====
+__pycache__/
+*.pyc
+*.pyo
+# 权重与检查点
+saved_models/
+weight/
+weights/
+*.pth
+*.pt
+*.pth.tar
+*.ckpt
+*.pkl
+*.onnx
+*.rknn
+*.so
+# 日志目录
+logs/
+log/
+otherlogs/
+# 数据集大文件（如被误 add）
+RDANet-main/datasets/**/images/
+RDANet-main/datasets/**/masks/
