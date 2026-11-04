@@ -315,50 +315,76 @@ class RSU4F(nn.Module):
         return hx1d + hxin
 
 
+# Encoder outs e1..e6 and decoder outs d5..d1 (not symmetric: stage2d/1d stay at 64).
+DEFAULT_ENC_OUTS = (64, 128, 256, 512, 512, 512)
+DEFAULT_DEC_OUTS = (512, 256, 128, 64, 64)  # stage5d..stage1d
+DEFAULT_MIDS_ENC = (32, 32, 64, 128, 256, 256)
+DEFAULT_MIDS_DEC = (256, 128, 64, 32, 16)
+
+
 ##### UIU-net ####
 class UIUNET(nn.Module):
 
-    def __init__(self, in_ch=3, out_ch=1):
+    def __init__(self, in_ch=3, out_ch=1, enc_outs=None, dec_outs=None,
+                 mids_enc=None, mids_dec=None):
+        """
+        enc_outs: stage1..stage6 output channels
+        dec_outs: stage5d..stage1d output channels
+        mids_*:   corresponding RSU mid channels (scaled proportionally when pruned)
+        """
         super(UIUNET, self).__init__()
 
-        self.stage1 = RSU7(in_ch,32,64)
-        self.pool12 = nn.MaxPool2d(2,stride=2,ceil_mode=True)
+        e = list(enc_outs) if enc_outs is not None else list(DEFAULT_ENC_OUTS)
+        d = list(dec_outs) if dec_outs is not None else list(DEFAULT_DEC_OUTS)
+        me = list(mids_enc) if mids_enc is not None else list(DEFAULT_MIDS_ENC)
+        md = list(mids_dec) if mids_dec is not None else list(DEFAULT_MIDS_DEC)
+        assert len(e) == 6 and len(d) == 5 and len(me) == 6 and len(md) == 5
+        self.enc_outs = e
+        self.dec_outs = d
+        self.mids_enc = me
+        self.mids_dec = md
 
-        self.stage2 = RSU6(64,32,128)
-        self.pool23 = nn.MaxPool2d(2,stride=2,ceil_mode=True)
+        e1, e2, e3, e4, e5, e6 = e
+        d5, d4, d3, d2, d1 = d
 
-        self.stage3 = RSU5(128,64,256)
-        self.pool34 = nn.MaxPool2d(2,stride=2,ceil_mode=True)
+        self.stage1 = RSU7(in_ch, me[0], e1)
+        self.pool12 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
 
-        self.stage4 = RSU4(256,128,512)
-        self.pool45 = nn.MaxPool2d(2,stride=2,ceil_mode=True)
+        self.stage2 = RSU6(e1, me[1], e2)
+        self.pool23 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
 
-        self.stage5 = RSU4F(512,256,512)
-        self.pool56 = nn.MaxPool2d(2,stride=2,ceil_mode=True)
+        self.stage3 = RSU5(e2, me[2], e3)
+        self.pool34 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
 
-        self.stage6 = RSU4F(512,256,512)
+        self.stage4 = RSU4(e3, me[3], e4)
+        self.pool45 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
 
-        # decoder
-        self.stage5d = RSU4F(1024,256,512)
-        self.stage4d = RSU4(1024,128,256)
-        self.stage3d = RSU5(512,64,128)
-        self.stage2d = RSU6(256,32,64)
-        self.stage1d = RSU7(128,16,64)
+        self.stage5 = RSU4F(e4, me[4], e5)
+        self.pool56 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
 
-        self.side1 = nn.Conv2d(64,out_ch,3,padding=1)
-        self.side2 = nn.Conv2d(64,out_ch,3,padding=1)
-        self.side3 = nn.Conv2d(128,out_ch,3,padding=1)
-        self.side4 = nn.Conv2d(256,out_ch,3,padding=1)
-        self.side5 = nn.Conv2d(512,out_ch,3,padding=1)
-        self.side6 = nn.Conv2d(512,out_ch,3,padding=1)
+        self.stage6 = RSU4F(e5, me[5], e6)
 
-        self.outconv = nn.Conv2d(6*out_ch,out_ch,1)
+        # decoder: each fuse returns two maps of size == low/out width, then cat
+        self.stage5d = RSU4F(e5 + e5, md[0], d5)
+        self.stage4d = RSU4(e4 + e4, md[1], d4)
+        self.stage3d = RSU5(e3 + e3, md[2], d3)
+        self.stage2d = RSU6(e2 + e2, md[3], d2)
+        self.stage1d = RSU7(d2 + e1, md[4], d1)
 
-        #self.fuse6 = self._fuse_layer(512, 512, 512, fuse_mode='AsymBi')
-        self.fuse5 = self._fuse_layer(512, 512, 512, fuse_mode='AsymBi')
-        self.fuse4 = self._fuse_layer(512, 512, 512, fuse_mode='AsymBi')
-        self.fuse3 = self._fuse_layer(256, 256, 256, fuse_mode='AsymBi')
-        self.fuse2 = self._fuse_layer(128, 128, 128, fuse_mode='AsymBi')
+        self.side1 = nn.Conv2d(d1, out_ch, 3, padding=1)
+        self.side2 = nn.Conv2d(d2, out_ch, 3, padding=1)
+        self.side3 = nn.Conv2d(d3, out_ch, 3, padding=1)
+        self.side4 = nn.Conv2d(d4, out_ch, 3, padding=1)
+        self.side5 = nn.Conv2d(d5, out_ch, 3, padding=1)
+        self.side6 = nn.Conv2d(e6, out_ch, 3, padding=1)
+
+        self.outconv = nn.Conv2d(6 * out_ch, out_ch, 1)
+
+        # fuse(high, low) -> out; assert in_low_channels == out_channels
+        self.fuse5 = self._fuse_layer(e6, e5, e5, fuse_mode='AsymBi')
+        self.fuse4 = self._fuse_layer(d5, e4, e4, fuse_mode='AsymBi')
+        self.fuse3 = self._fuse_layer(d4, e3, e3, fuse_mode='AsymBi')
+        self.fuse2 = self._fuse_layer(d3, e2, e2, fuse_mode='AsymBi')
 
 
     def _fuse_layer(self, in_high_channels, in_low_channels, out_channels,fuse_mode='AsymBi'):#fuse_mode='AsymBi'
