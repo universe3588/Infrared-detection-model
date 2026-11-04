@@ -1,0 +1,3 @@
+tag,ckpt,input_size,params,params_M,macs,macs_G,flops,flops_G,method,best_iou,enc_outs,dec_outs
+teacher,/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/saved_models/uiunet_irstd/NUAA-SIRST_20261030_151749/uiunet_best.pth.tar,256,50541461,50.541,54501083904,54.501,109002167808,109.002,thop,0.7686492367539295,"64,128,256,512,512,512","512,256,128,64,64"
+student,/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/compress_runs/NUAA-SIRST_pipeline_20261104_143259/student_best.pth.tar,256,13885606,13.886,23382403556,23.382,46764807112,46.765,thop,0.7740700386984404,"51,90,154,256,256,256","256,154,90,51,51"
