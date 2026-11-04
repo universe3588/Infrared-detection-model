@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from datetime import datetime
 
 import numpy as np
@@ -21,7 +22,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from tqdm import tqdm
 
 from compress.adapters.uiunet_adapter import TEACHER_STAGE_WIDTHS, UIUNetAdapter
 from compress.importance import ImportanceEstimator, choose_keep_indices
@@ -31,6 +31,7 @@ from compress.losses import (
     multi_bce_loss,
     take_final,
 )
+from compress.progress import StageTimer, make_pbar
 from compress.prune import (
     build_pruned_uiunet,
     count_parameters,
@@ -112,19 +113,24 @@ def build_teacher(ckpt_path, device):
 
 
 @torch.no_grad()
-def evaluate(model, loader, device):
+def evaluate(model, loader, device, desc: str = "[eval]"):
     model.eval()
     ious = []
-    for data in loader:
+    total = len(loader) if hasattr(loader, "__len__") else None
+    pbar = make_pbar(loader, total=total, desc=desc, unit="img", leave=False)
+    for data in pbar:
         inputs = data["image"].type(torch.FloatTensor).to(device)
         labels = data["label"].type(torch.FloatTensor).to(device)
         d0, *_ = model(inputs)
-        ious.append(soft_iou(d0, labels))
+        iou = soft_iou(d0, labels)
+        ious.append(iou)
+        pbar.set_postfix(iou=f"{iou:.4f}")
     model.train()
     return float(np.mean(ious)) if ious else 0.0
 
 
 def run_score(args, teacher, train_loader, device, work_dir):
+    timer = StageTimer("P1 score")
     adapter = UIUNetAdapter(TEACHER_STAGE_WIDTHS)
     for p in teacher.parameters():
         p.requires_grad_(True)
@@ -156,10 +162,12 @@ def run_score(args, teacher, train_loader, device, work_dir):
         "alpha": args.alpha,
         "dataset": args.dataset,
     })
+    timer.done(f"student widths={sw}")
     return scores_path, keep_path, keep_idx
 
 
 def run_prune(args, teacher, keep_idx, device, work_dir):
+    timer = StageTimer("P2 prune")
     student = build_pruned_uiunet(
         teacher, keep_idx=keep_idx, min_keep=args.min_keep, in_ch=3, out_ch=1,
     )
@@ -176,10 +184,12 @@ def run_prune(args, teacher, keep_idx, device, work_dir):
         "stage_widths": sw,
     }, out)
     print(f"[save] student init -> {out}")
+    timer.done(f"params={count_parameters(student):.3f}M")
     return student, out
 
 
 def run_distill(args, teacher, student, train_loader, test_loader, device, work_dir):
+    timer = StageTimer("P3 distill")
     teacher.eval()
     for p in teacher.parameters():
         p.requires_grad_(False)
@@ -202,13 +212,28 @@ def run_distill(args, teacher, student, train_loader, test_loader, device, work_
     with open(log_path, "w", encoding="utf-8") as f:
         f.write("epoch,train_loss,test_iou,seg,region,kd\n")
 
+    n_train = len(train_loader) if hasattr(train_loader, "__len__") else None
+    epoch_bar = make_pbar(
+        total=args.epochs,
+        desc=f"[P3] {args.dataset}",
+        unit="epoch",
+        leave=True,
+    )
+
     for epoch in range(1, args.epochs + 1):
         student.train()
         run_loss = 0.0
         run_seg = run_reg = run_kd = 0.0
         n = 0
-        pbar = tqdm(train_loader, desc=f"distill {epoch}/{args.epochs}", ncols=110)
-        for data in pbar:
+        t_ep = time.time()
+        batch_bar = make_pbar(
+            train_loader,
+            total=n_train,
+            desc=f"  train {epoch}/{args.epochs}",
+            unit="batch",
+            leave=False,
+        )
+        for data in batch_bar:
             inputs = data["image"].type(torch.FloatTensor).to(device)
             labels = data["label"].type(torch.FloatTensor).to(device)
             optimizer.zero_grad()
@@ -232,28 +257,34 @@ def run_distill(args, teacher, student, train_loader, test_loader, device, work_
             run_reg += float(loss_region.item())
             run_kd += float(loss_kd.item())
             n += 1
-            pbar.set_postfix(loss=f"{run_loss/n:.4f}")
+            batch_bar.set_postfix(
+                loss=f"{run_loss / n:.4f}",
+                kd=f"{run_kd / n:.4f}",
+                lr=f"{optimizer.param_groups[0]['lr']:.2e}",
+            )
+        batch_bar.close()
 
         scheduler.step()
         avg = run_loss / max(1, n)
         test_iou = -1.0
         if epoch % args.eval_every == 0 or epoch == args.epochs:
-            test_iou = evaluate(student, test_loader, device)
-            print(f"[eval] epoch={epoch} test_IoU={test_iou:.4f} best={max(best_iou, test_iou):.4f}")
+            test_iou = evaluate(
+                student, test_loader, device,
+                desc=f"  eval  {epoch}/{args.epochs}",
+            )
             if test_iou > best_iou:
                 best_iou = test_iou
-                enc = list(student.enc_outs)
                 path = os.path.join(work_dir, "student_best.pth.tar")
                 torch.save({
                     "epoch": epoch,
                     "state_dict": student.state_dict(),
                     "best_iou": best_iou,
-                    "enc_outs": enc,
+                    "enc_outs": list(student.enc_outs),
                     "dec_outs": list(student.dec_outs),
                     "mids_enc": list(student.mids_enc),
                     "mids_dec": list(student.mids_dec),
                 }, path)
-                print(f"[save] best IoU={best_iou:.4f} -> {path}")
+                epoch_bar.write(f"[save] best IoU={best_iou:.4f} -> {path}")
 
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(
@@ -261,6 +292,17 @@ def run_distill(args, teacher, student, train_loader, test_loader, device, work_
                 f"{run_seg/max(1,n):.6f},{run_reg/max(1,n):.6f},{run_kd/max(1,n):.6f}\n"
             )
 
+        ep_sec = time.time() - t_ep
+        epoch_bar.set_postfix(
+            loss=f"{avg:.4f}",
+            iou=f"{test_iou:.4f}" if test_iou >= 0 else "n/a",
+            best=f"{best_iou:.4f}" if best_iou >= 0 else "n/a",
+            ep_s=f"{ep_sec:.0f}s",
+        )
+        epoch_bar.update(1)
+
+    epoch_bar.close()
+    timer.done(f"best_iou={best_iou:.4f}")
     return best_iou
 
 
@@ -291,12 +333,20 @@ def main():
     os.makedirs(work_dir, exist_ok=True)
     with open(os.path.join(work_dir, "args.json"), "w", encoding="utf-8") as f:
         json.dump(vars(args), f, indent=2, ensure_ascii=False)
-    print(f"[work_dir] {work_dir}")
+
+    pipeline_t0 = time.time()
+    print(f"[work_dir] {work_dir}", flush=True)
+    print(
+        f"[plan] mode={args.mode} dataset={args.dataset} "
+        f"epochs={args.epochs} score_batches={args.score_batches} "
+        f"prune_rates={args.prune_rates}",
+        flush=True,
+    )
 
     train_loader, test_loader = build_loaders(data_args, root)
     teacher = build_teacher(args.teacher_ckpt, device)
-    t_iou = evaluate(teacher, test_loader, device)
-    print(f"[teacher eval] test_IoU={t_iou:.4f}")
+    t_iou = evaluate(teacher, test_loader, device, desc="[teacher eval]")
+    print(f"[teacher eval] test_IoU={t_iou:.4f}", flush=True)
 
     keep_idx = None
     student = None
@@ -310,8 +360,8 @@ def main():
         if keep_idx is None:
             raise ValueError("keep masks required")
         student, _ = run_prune(args, teacher, keep_idx, device, work_dir)
-        s_iou = evaluate(student, test_loader, device)
-        print(f"[student init eval] test_IoU={s_iou:.4f}")
+        s_iou = evaluate(student, test_loader, device, desc="[student init eval]")
+        print(f"[student init eval] test_IoU={s_iou:.4f}", flush=True)
 
     if args.mode in ("distill", "pipeline"):
         if student is None:
@@ -323,7 +373,12 @@ def main():
                 student.load_state_dict(state, strict=False)
                 student.to(device)
         best = run_distill(args, teacher, student, train_loader, test_loader, device, work_dir)
-        print(f"[done] best student IoU={best:.4f}")
+        print(f"[done] best student IoU={best:.4f}", flush=True)
+
+    total_sec = int(time.time() - pipeline_t0)
+    h, rem = divmod(total_sec, 3600)
+    m, s = divmod(rem, 60)
+    print(f"[pipeline] total wall time {h:02d}:{m:02d}:{s:02d}", flush=True)
 
 
 if __name__ == "__main__":

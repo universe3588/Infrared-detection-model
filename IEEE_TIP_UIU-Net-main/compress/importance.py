@@ -5,10 +5,10 @@ from typing import Dict, List, Sequence
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from tqdm import tqdm
 
 from compress.adapters.uiunet_adapter import UIUNetAdapter
 from compress.losses import RegionSoftIoULoss, take_final
+from compress.progress import make_pbar
 
 
 class ImportanceEstimator:
@@ -66,9 +66,15 @@ class ImportanceEstimator:
             for m in modules:
                 handles.append(m.register_forward_hook(make_hook(stage)))
 
+        total = min(self.max_batches, len(dataloader)) if hasattr(dataloader, "__len__") else self.max_batches
         n_batches = 0
-        pbar = tqdm(dataloader, desc="Importance scoring")
-        for batch in pbar:
+        pbar = make_pbar(
+            total=total,
+            desc="[P1] score",
+            unit="batch",
+            leave=True,
+        )
+        for batch in dataloader:
             if n_batches >= self.max_batches:
                 break
             if isinstance(batch, dict):
@@ -104,7 +110,10 @@ class ImportanceEstimator:
                     contrast_counts[stage] += 1
 
             n_batches += 1
+            pbar.set_postfix(loss=f"{float(loss.item()):.4f}")
+            pbar.update(1)
 
+        pbar.close()
         for h in handles:
             h.remove()
 

@@ -61,9 +61,16 @@ Windows PowerShell 把 `\` 行续换成 `` ` ``，或写成一行。
 
 ```bash
 bash run_compress_all.sh
+# 建议用 python -u / tee 保留进度条 ETA：
+bash run_compress_all.sh 2>&1 | tee compress_all.log
 ```
 
-（先改脚本里的教师 ckpt 路径。）
+进度条会显示：
+- **P1 score**：batch 级 `% / elapsed / remaining`
+- **P3 distill**：外层 epoch 级 ETA + 内层 batch 级（`loss/best/ep_s`）
+- **run_compress_all.sh**：`[i/4] 数据集` + 按已完成集粗估剩余时间
+
+（先确认脚本里的教师 ckpt 路径。）
 
 ---
 
