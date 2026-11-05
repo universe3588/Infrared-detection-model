@@ -19,7 +19,8 @@ weights/
 *.onnx
 *.rknn
 *.so
-# 日志目录
+# 压缩训练产物与日志
+compress_runs/
 logs/
 log/
 otherlogs/

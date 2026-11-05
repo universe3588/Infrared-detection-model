@@ -7,9 +7,10 @@ class ChannelAttention(nn.Module):
         super(ChannelAttention, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
-        self.fc1   = nn.Conv2d(in_planes, in_planes // 16, 1, bias=False)
+        mid = max(1, in_planes // ratio)  # 剪枝后通道 <16 时避免 mid=0
+        self.fc1   = nn.Conv2d(in_planes, mid, 1, bias=False)
         self.relu1 = nn.ReLU()
-        self.fc2   = nn.Conv2d(in_planes // 16, in_planes, 1, bias=False)
+        self.fc2   = nn.Conv2d(mid, in_planes, 1, bias=False)
         self.sigmoid = nn.Sigmoid()
     def forward(self, x):
         avg_out = self.fc2(self.relu1(self.fc1(self.avg_pool(x))))
@@ -64,11 +65,18 @@ class ResNet(nn.Module):
         out = self.relu(out)
         return out
 
+DEFAULT_CHANNELS = (16, 32, 64, 128, 256)
+DEFAULT_BLOCKS = (2, 2, 2, 2)
+
+
 class MSHNet(nn.Module):
-    def __init__(self, input_channels, block=ResNet):
+    def __init__(self, input_channels, block=ResNet, channels=None, blocks=None):
         super().__init__()
-        param_channels = [16, 32, 64, 128, 256]
-        param_blocks = [2, 2, 2, 2]
+        param_channels = list(channels) if channels is not None else list(DEFAULT_CHANNELS)
+        param_blocks = list(blocks) if blocks is not None else list(DEFAULT_BLOCKS)
+        assert len(param_channels) == 5 and len(param_blocks) == 4
+        self.param_channels = param_channels
+        self.param_blocks = param_blocks
         self.pool = nn.MaxPool2d(2, 2)
         self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         self.up_4 = nn.Upsample(scale_factor=4, mode='bilinear', align_corners=True)

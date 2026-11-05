@@ -1,42 +1,42 @@
 # UIU-Net 教师 vs 学生：资源补充测量（NUAA, 256）
 
-> 填表方式对齐 DNANet `outputs/resource/COMPARE_RESOURCE.md`。  
-> 跑完 `run_uiunet_export_autodl.sh` + 板端 `resource_bench.py` 后把数字填入。
+对齐 DNANet `outputs/resource/COMPARE_RESOURCE.md` 指标列。  
+板端：`resource_bench.py`，warmup=20，iters=80，core_mask=7，librknnrt 2.5.0。
 
-## 0. 精度（训练日志，非正式板端复测）
+## 0. 精度（训练日志）
 
 | | Teacher | Student |
 |--|---------|---------|
 | Best IoU (NUAA) | 0.7686 | 0.7741 |
 
-## 1. 参数量 / FLOPs（`measure_uiunet_complexity.py`）
+学生通道：`enc=51,90,154,256,256,256` / `dec=256,154,90,51,51`
+
+## 1. 参数量 / FLOPs（`complexity_nuaa.csv`，thop，@256）
 
 | 指标 | 教师 | 学生 | 变化 |
 |------|------|------|------|
-| Params | _M | _M | _% |
-| FLOPs (≈2×MACs) | _G | _G | _% |
-
-数据文件：`complexity_nuaa.csv`
+| Params | 50.541 M | 13.886 M | **−72.5%** |
+| FLOPs (≈2×MACs) | 109.002 G | 46.765 G | **−57.1%** |
 
 ## 2. RKNN 体积
 
 | 指标 | 教师 | 学生 | 变化 |
 |------|------|------|------|
-| RKNN 体积 | _MB | _MB | _% |
+| RKNN 体积 | 113.82 MB | 34.70 MB | **−69.5%** |
 
-## 3. 板端进程内存 + NPU 忙碌估计（`resource_bench.py`，建议 80 iters）
+## 3. 板端进程内存 + NPU 忙碌估计
 
 | 指标 | 教师 | 学生 | 变化 |
 |------|------|------|------|
-| 延迟 mean | _ms | _ms | _% |
-| 进程 RSS mean | _MB | _MB | _% |
-| 估计 NPU 忙碌 ms/帧 | _ | _ | _ |
+| 延迟 mean | 658.9 ms | 404.3 ms | **−38.6%** |
+| 进程 RSS mean | 197.96 MB | 110.75 MB | **−44.1%** |
+| 估计 NPU 忙碌 ms/帧 | 309.0 | 221.5 | **−28.3%** |
 | 单位帧能耗 | — | — | 未测（需功率计） |
 
-数据文件：`resource/resource_bench.csv`
+原始数据：`complexity_nuaa.csv`、`resource/resource_bench.csv`。
 
 ## 4. 结论（可直接支撑论文表述）
 
-- （待填）Params / FLOPs / RKNN 体积变化  
-- （待填）墙钟延迟与 NPU busy 是否同 DNANet 一样「算力腰斩 ≠ 时延腰斩」  
-- 能耗本轮不测
+1. **资源下降明确**：Params −72.5%、FLOPs −57.1%、RKNN 体积 −69.5%、进程 RSS −44.1%；NUAA IoU 未降（0.769 → 0.774）。
+2. **墙钟延迟同步改善**：延迟 mean −38.6%（658.9 → 404.3 ms），估计 NPU 忙碌 −28.3%。相对 DNANet 同协议下「算力腰斩但延迟仅约 −12%、NPU busy 近似持平」，UIU 学生在 RK3588 上获得了更明显的时延与忙碌时间收益。
+3. **能耗**本轮未测，需外接功率计。
