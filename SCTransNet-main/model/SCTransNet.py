@@ -82,6 +82,16 @@ class Reconstruct(nn.Module):
         return out
 
 
+def _groups_divisible(channels, prefer_half=True):
+    """groups must divide channels; prefer channels//2 (Attention_org 原设定)."""
+    if channels <= 0:
+        return 1
+    g = max(1, channels // 2) if prefer_half else channels
+    while g > 1 and channels % g != 0:
+        g -= 1
+    return g
+
+
 # spatial-embedded Single-head Channel-cross Attention (SSCA)
 class Attention_org(nn.Module):
     def __init__(self, config, vis, channel_num):
@@ -101,22 +111,19 @@ class Attention_org(nn.Module):
         self.mheadk = nn.Conv2d(self.KV_size, self.KV_size * self.num_attention_heads, kernel_size=1, bias=False)
         self.mheadv = nn.Conv2d(self.KV_size, self.KV_size * self.num_attention_heads, kernel_size=1, bias=False)
 
-        self.q1 = nn.Conv2d(channel_num[0] * self.num_attention_heads, channel_num[0] * self.num_attention_heads, kernel_size=3, stride=1,
-                            padding=1,
-                            groups=channel_num[0] * self.num_attention_heads // 2, bias=False)
-        self.q2 = nn.Conv2d(channel_num[1] * self.num_attention_heads, channel_num[1] * self.num_attention_heads, kernel_size=3, stride=1,
-                            padding=1,
-                            groups=channel_num[1] * self.num_attention_heads // 2, bias=False)
-        self.q3 = nn.Conv2d(channel_num[2] * self.num_attention_heads, channel_num[2] * self.num_attention_heads, kernel_size=3, stride=1,
-                            padding=1,
-                            groups=channel_num[2] * self.num_attention_heads // 2, bias=False)
-        self.q4 = nn.Conv2d(channel_num[3] * self.num_attention_heads, channel_num[3] * self.num_attention_heads, kernel_size=3, stride=1,
-                            padding=1,
-                            groups=channel_num[3] * self.num_attention_heads // 2, bias=False)
-        self.k = nn.Conv2d(self.KV_size * self.num_attention_heads, self.KV_size * self.num_attention_heads, kernel_size=3, stride=1,
-                           padding=1, groups=self.KV_size * self.num_attention_heads, bias=False)
-        self.v = nn.Conv2d(self.KV_size * self.num_attention_heads, self.KV_size * self.num_attention_heads, kernel_size=3, stride=1,
-                           padding=1, groups=self.KV_size * self.num_attention_heads, bias=False)
+        h = self.num_attention_heads
+        self.q1 = nn.Conv2d(channel_num[0] * h, channel_num[0] * h, kernel_size=3, stride=1,
+                            padding=1, groups=_groups_divisible(channel_num[0] * h), bias=False)
+        self.q2 = nn.Conv2d(channel_num[1] * h, channel_num[1] * h, kernel_size=3, stride=1,
+                            padding=1, groups=_groups_divisible(channel_num[1] * h), bias=False)
+        self.q3 = nn.Conv2d(channel_num[2] * h, channel_num[2] * h, kernel_size=3, stride=1,
+                            padding=1, groups=_groups_divisible(channel_num[2] * h), bias=False)
+        self.q4 = nn.Conv2d(channel_num[3] * h, channel_num[3] * h, kernel_size=3, stride=1,
+                            padding=1, groups=_groups_divisible(channel_num[3] * h), bias=False)
+        self.k = nn.Conv2d(self.KV_size * h, self.KV_size * h, kernel_size=3, stride=1,
+                           padding=1, groups=_groups_divisible(self.KV_size * h, prefer_half=False), bias=False)
+        self.v = nn.Conv2d(self.KV_size * h, self.KV_size * h, kernel_size=3, stride=1,
+                           padding=1, groups=_groups_divisible(self.KV_size * h, prefer_half=False), bias=False)
 
         self.project_out1 = nn.Conv2d(channel_num[0], channel_num[0], kernel_size=1, bias=False)
         self.project_out2 = nn.Conv2d(channel_num[1], channel_num[1], kernel_size=1, bias=False)
@@ -559,7 +566,8 @@ class Res_block(nn.Module):
 
 
 class SCTransNet(nn.Module):
-    def __init__(self, config, n_channels=1, n_classes=1, img_size=256, vis=False, mode='train', deepsuper=True):
+    def __init__(self, config, n_channels=1, n_classes=1, img_size=256, vis=False, mode='train',
+                 deepsuper=True, channel_num=None):
         super().__init__()
         self.vis = vis
         self.deepsuper = deepsuper
@@ -567,28 +575,40 @@ class SCTransNet(nn.Module):
         self.mode = mode
         self.n_channels = n_channels
         self.n_classes = n_classes
-        in_channels = config.base_channel  # basic channel 64
+        # 教师默认 [32,64,128,256]；剪枝学生传入自定义四档宽度
+        if channel_num is None:
+            base = int(config.base_channel)
+            channel_num = [base, base * 2, base * 4, base * 8]
+        else:
+            channel_num = [int(x) for x in channel_num]
+            assert len(channel_num) == 4
+        self.channel_num = list(channel_num)
+        c0, c1, c2, c3 = self.channel_num
+        # Transformer KV 维 = 四尺度通道和
+        config.KV_size = int(c0 + c1 + c2 + c3)
+        config.base_channel = int(c0)
         block = Res_block
         self.pool = nn.MaxPool2d(2, 2)
-        self.inc = self._make_layer(block, n_channels, in_channels)
-        self.down_encoder1 = self._make_layer(block, in_channels, in_channels * 2, 1)  # 64  128
-        self.down_encoder2 = self._make_layer(block, in_channels * 2, in_channels * 4, 1)  # 64  128
-        self.down_encoder3 = self._make_layer(block, in_channels * 4, in_channels * 8, 1)  # 64  128
-        self.down_encoder4 = self._make_layer(block, in_channels * 8, in_channels * 8, 1)  # 64  128
+        self.inc = self._make_layer(block, n_channels, c0)
+        self.down_encoder1 = self._make_layer(block, c0, c1, 1)
+        self.down_encoder2 = self._make_layer(block, c1, c2, 1)
+        self.down_encoder3 = self._make_layer(block, c2, c3, 1)
+        self.down_encoder4 = self._make_layer(block, c3, c3, 1)  # bottleneck 与 stage3 同宽
         self.mtc = ChannelTransformer(config, vis, img_size,
-                                      channel_num=[in_channels, in_channels * 2, in_channels * 4, in_channels * 8],
+                                      channel_num=self.channel_num,
                                       patchSize=config.patch_sizes)
-        self.up_decoder4 = UpBlock_attention(in_channels * 16, in_channels * 4, nb_Conv=2)
-        self.up_decoder3 = UpBlock_attention(in_channels * 8, in_channels * 2, nb_Conv=2)
-        self.up_decoder2 = UpBlock_attention(in_channels * 4, in_channels, nb_Conv=2)
-        self.up_decoder1 = UpBlock_attention(in_channels * 2, in_channels, nb_Conv=2)
-        self.outc = nn.Conv2d(in_channels, n_classes, kernel_size=(1, 1), stride=(1, 1))
+        # UpBlock in_ch = skip + up = 2 * low_stage
+        self.up_decoder4 = UpBlock_attention(c3 + c3, c2, nb_Conv=2)
+        self.up_decoder3 = UpBlock_attention(c2 + c2, c1, nb_Conv=2)
+        self.up_decoder2 = UpBlock_attention(c1 + c1, c0, nb_Conv=2)
+        self.up_decoder1 = UpBlock_attention(c0 + c0, c0, nb_Conv=2)
+        self.outc = nn.Conv2d(c0, n_classes, kernel_size=(1, 1), stride=(1, 1))
 
         if self.deepsuper:
-            self.gt_conv5 = nn.Sequential(nn.Conv2d(in_channels * 8, 1, 1))
-            self.gt_conv4 = nn.Sequential(nn.Conv2d(in_channels * 4, 1, 1))
-            self.gt_conv3 = nn.Sequential(nn.Conv2d(in_channels * 2, 1, 1))
-            self.gt_conv2 = nn.Sequential(nn.Conv2d(in_channels * 1, 1, 1))
+            self.gt_conv5 = nn.Sequential(nn.Conv2d(c3, 1, 1))
+            self.gt_conv4 = nn.Sequential(nn.Conv2d(c2, 1, 1))
+            self.gt_conv3 = nn.Sequential(nn.Conv2d(c1, 1, 1))
+            self.gt_conv2 = nn.Sequential(nn.Conv2d(c0, 1, 1))
             self.outconv = nn.Conv2d(5 * 1, 1, 1)
 
     def _make_layer(self, block, input_channels, output_channels, num_blocks=1):
