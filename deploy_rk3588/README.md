@@ -4,6 +4,7 @@
 
 - **DNANet**：`export_onnx.py` + `ADB_DEPLOY.md` + `outputs/resource/COMPARE_RESOURCE.md`
 - **UIU-Net**：`export_uiunet_onnx.py` + `run_uiunet_export_autodl.sh` + `ADB_DEPLOY_UIUNET.md` + `outputs/uiunet/COMPARE_RESOURCE.md`
+- **MSHNet**：`export_mshnet_onnx.py` + `run_mshnet_export_autodl.sh` + `ADB_DEPLOY_MSHNET.md` + `outputs/mshnet/COMPARE_RESOURCE.md`
 
 剪枝蒸馏后的学生模型在 NUAA / IRSTD-1k / SIRST-V2 上 IoU 相对教师基本持平或略优；NUDT 需用 `--train_aug resize`（必要时略降剪枝率）。本文件夹用于验证 **板端实际时延与资源占用**，不替代精度表。
 
