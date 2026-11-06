@@ -17,9 +17,12 @@
 
 ## 默认超参
 
-- `prune_rates=0.20,0.30,0.40,0.50`（4 档；keep 强制偶数以兼容 depthwise groups）
-- `epochs=200`，`lr=1e-3` Adam，`batch=8`，`patch=256`
-- 教师：`log/<DS>/SCTransNet_*_best.pth.tar`
+- **v1（首轮）** `prune_rates=0.20,0.30,0.40,0.50`：难集 IRSTD/SIRST-V2 掉约 5–6 pp  
+- **v2（推荐）** `prune_rates=0.10,0.20,0.30,0.40`，`epochs=300`，`lr=5e-4`，`lambda_region=0.75`  
+  理由：Transformer 不剪时同等 CNN 配额过猛；仍属预算 `{p_s}` 实例化，协议不变  
+- keep 强制偶数以兼容 depthwise groups；`batch=8`，`patch=256`  
+- 教师：`log/<DS>/SCTransNet_*_best.pth.tar`  
+- 难集优先：`bash run_compress_hardsets.sh`
 
 ## 产物
 
