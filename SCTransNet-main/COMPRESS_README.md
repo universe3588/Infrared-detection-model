@@ -35,24 +35,41 @@ Transformer 不参与剪枝时，同等 CNN 剪枝率对难集过猛。论文叙
 | `lr` | 1e-3 | **5e-4** |
 | `lambda_region` | 0.5 | **0.75** |
 
-预期通道约 `[28, 52, 90, 154]`（偶数对齐后以日志为准），参数压缩会弱于首轮 ~67%，但精度应更接近教师。
+v2 实际通道 `[30, 52, 90, 154]`，Params **5.075M（−55%）**；IRSTD 收到 −2.7 pp，SIRST-V2 仍约 **−5.4 pp**。
+
+**v3（仅 SIRST-V2，冲 ≤3 pp）：**
+
+| 参数 | v2 | v3 |
+|------|----|----|
+| `prune_rates` | 0.10,0.20,0.30,0.40 | **0.05,0.15,0.25,0.35** |
+| 预期通道 | [30,52,90,154] | 约 **[30,54,96,166]** |
+| `epochs` | 300 | **350** |
+| `lr` | 5e-4 | **3e-4**（减轻末段回落） |
+| 目标 | — | 学生 ≳ **0.7435**（教师 0.7735−3pp） |
 
 ---
 
-## 1. 推荐：只重跑难集
+## 1. 当前推荐：只救 SIRST-V2（v3）
 
 ```bash
 cd SCTransNet-main
-bash run_compress_hardsets.sh
-# 或
-DATASETS="IRSTD-1k SIRST-V2" bash run_compress_all.sh 2>&1 | tee compress_hardsets_v2.log
+bash run_compress_sirstv2_v3.sh
+# 日志：compress_sirstv2_v3.log → 搜 best_iou=
 ```
 
-AutoDL 过夜（默认难集）：
+难集 v2（IRSTD 已可接受，一般不必重跑）：
 
 ```bash
+bash run_compress_hardsets.sh
+```
+
+AutoDL：
+
+```bash
+# 只跑 SIRST-V2 v3
+bash SCTransNet-main/run_compress_sirstv2_v3.sh
+# 或过夜脚本默认难集 v2：
 bash scripts/run_sctrans_compress_overnight.sh
-# 四集全量：FULL=1 bash scripts/run_sctrans_compress_overnight.sh
 ```
 
 ---
@@ -95,7 +112,7 @@ bash run_compress_all.sh 2>&1 | tee compress_all_v2.log
 | `--lambda_region` | `0.75` | 强化小目标区域 |
 | `--batch_size` | `8` | 按显存调整 |
 
-若难集仍掉 >3 pp，可再试更保守：`PRUNE_RATES=0.05,0.15,0.25,0.35`（仍不改框架）。
+若 v3 仍掉 >3 pp，可再试几乎不剪浅层：`PRUNE_RATES=0.05,0.10,0.20,0.30`（仍不改框架）。
 
 ---
 
