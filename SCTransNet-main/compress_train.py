@@ -6,8 +6,8 @@ Modes: score | prune | distill | pipeline
 Example:
   python compress_train.py --mode pipeline \\
     --teacher_ckpt log/NUAA-SIRST/SCTransNet_781_best.pth.tar \\
-    --dataset NUAA-SIRST --dataset_dir ../RDANet-main/datasets --epochs 300 \\
-    --prune_rates 0.10,0.20,0.30,0.40 --lr 5e-4 --lambda_region 0.75
+    --dataset NUAA-SIRST --dataset_dir ../RDANet-main/datasets --epochs 350 \\
+    --prune_rates 0.05,0.15,0.25,0.35 --lr 3e-4 --lambda_region 0.75
 """
 
 from __future__ import annotations
@@ -67,15 +67,14 @@ def parse_args():
     p.add_argument("--score_batches", type=int, default=50)
     p.add_argument("--alpha", type=float, default=0.7)
     p.add_argument("--dilate", type=int, default=3)
-    # SCTrans 默认配额比纯 CNN 骨干更保守：Transformer 层数/头数不剪，
-    # 同等 p_s 会过度削弱 CNN 表征（IRSTD/SIRST-V2 上首轮掉点明显）。
-    # 协议仍是 P1→P2→P3，仅预算 B 的 {p_s} 实例化不同；DNA/UIU/MSH 不受影响。
-    p.add_argument("--prune_rates", type=str, default="0.10,0.20,0.30,0.40",
-                   help="4 rates for channels 32/64/128/256 (milder than CNN-only defaults)")
+    # SCTrans 定稿默认 = v3：Transformer 不剪时 CNN 配额更保守。
+    # 协议仍是 P1→P2→P3；DNA/UIU/MSH 不受影响。
+    p.add_argument("--prune_rates", type=str, default="0.05,0.15,0.25,0.35",
+                   help="4 rates for channels 32/64/128/256 (v3 milder budget)")
     p.add_argument("--min_keep", type=int, default=4)
 
-    p.add_argument("--epochs", type=int, default=300)
-    p.add_argument("--lr", type=float, default=5e-4)
+    p.add_argument("--epochs", type=int, default=350)
+    p.add_argument("--lr", type=float, default=3e-4)
     p.add_argument("--min_lr", type=float, default=1e-5)
     p.add_argument("--optimizer", type=str, default="Adam", choices=["Adam", "Adagrad"])
     p.add_argument("--lambda_seg", type=float, default=1.0)

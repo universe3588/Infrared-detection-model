@@ -1,29 +1,29 @@
 #!/usr/bin/env bash
 # SCTransNet 压缩流水线（P1→P2→P3，框架不变）
 #
-# 相对首轮更保守的默认（仅本骨干）：
-#   PRUNE_RATES=0.10,0.20,0.30,0.40
-#   EPOCHS=300  LR=5e-4  LAMBDA_REGION=0.75
+# 定稿默认 = v3（仅本骨干）：
+#   PRUNE_RATES=0.05,0.15,0.25,0.35
+#   EPOCHS=350  LR=3e-4  LAMBDA_REGION=0.75
 #
 # 用法：
 #   bash run_compress_all.sh                          # 四数据集
-#   DATASETS="IRSTD-1k SIRST-V2" bash run_compress_all.sh   # 只重跑难集
-#   bash run_compress_all.sh 2>&1 | tee compress_all_v2.log
+#   DATASETS="NUAA-SIRST NUDT-SIRST IRSTD-1k" bash run_compress_all.sh
+#   bash run_compress_v3_all.sh                       # 推荐：剩余三集统一 v3
 set -euo pipefail
 cd "$(dirname "$0")"
 export PYTHONUNBUFFERED=1
 
 DATASET_DIR="${DATASET_DIR:-../RDANet-main/datasets}"
-EPOCHS="${EPOCHS:-300}"
+EPOCHS="${EPOCHS:-350}"
 BS="${BS:-8}"
-LR="${LR:-0.0005}"
+LR="${LR:-0.0003}"
 MIN_LR="${MIN_LR:-0.00001}"
-PRUNE_RATES="${PRUNE_RATES:-0.10,0.20,0.30,0.40}"
+PRUNE_RATES="${PRUNE_RATES:-0.05,0.15,0.25,0.35}"
 LAMBDA_REGION="${LAMBDA_REGION:-0.75}"
 LAMBDA_KD="${LAMBDA_KD:-1.0}"
 ALPHA="${ALPHA:-0.7}"
 WORK_DIR="${WORK_DIR:-./compress_runs}"
-# 空格分隔；默认四集。难集优先可：DATASETS="IRSTD-1k SIRST-V2"
+# 空格分隔；默认四集
 DATASETS_STR="${DATASETS:-NUAA-SIRST NUDT-SIRST IRSTD-1k SIRST-V2}"
 # shellcheck disable=SC2206
 DATASETS=($DATASETS_STR)

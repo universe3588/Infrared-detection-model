@@ -49,27 +49,22 @@ v2 实际通道 `[30, 52, 90, 154]`，Params **5.075M（−55%）**；IRSTD 收�
 
 ---
 
-## 1. 当前推荐：只救 SIRST-V2（v3）
+## 1. 当前推荐：四集统一 v3（SIRST-V2 已完成则只跑前三）
 
 ```bash
 cd SCTransNet-main
-bash run_compress_sirstv2_v3.sh
-# 日志：compress_sirstv2_v3.log → 搜 best_iou=
+# 默认：NUAA + NUDT + IRSTD（跳过已完成的 SIRST-V2）
+bash run_compress_v3_all.sh
+
+# 四集全量重跑：
+DATASETS="NUAA-SIRST NUDT-SIRST IRSTD-1k SIRST-V2" bash run_compress_v3_all.sh
 ```
 
-难集 v2（IRSTD 已可接受，一般不必重跑）：
+过夜串联（SCTrans v3 剩余三集 → DNA 师生同脚本复测，防空转）：
 
 ```bash
-bash run_compress_hardsets.sh
-```
-
-AutoDL：
-
-```bash
-# 只跑 SIRST-V2 v3
-bash SCTransNet-main/run_compress_sirstv2_v3.sh
-# 或过夜脚本默认难集 v2：
-bash scripts/run_sctrans_compress_overnight.sh
+bash scripts/run_overnight_sctrans_v3_dna_reeval.sh
+# 连 SIRST-V2 也重跑：INCLUDE_SIRSTV2=1 bash scripts/run_overnight_sctrans_v3_dna_reeval.sh
 ```
 
 ---

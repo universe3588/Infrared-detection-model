@@ -63,6 +63,14 @@ python compress_train.py --mode prune --teacher_ckpt TEACHER.pth.tar --keep_path
 python compress_train.py --mode distill --teacher_ckpt TEACHER.pth.tar --keep_path xxx/keep_masks.pt --student_ckpt xxx/student_init.pth.tar --epochs 200 ...
 ```
 
+### 师生同脚本复测（解释学生暴涨）
+
+```bash
+# 一键四数据集（自动挑最新 teacher + student_best）
+bash run_dna_fair_reeval.sh
+# 产物：compress_runs/fair_reeval_*/summary.csv 与各集 *_eval_metrics.json
+```
+
 ---
 
 ## 3. 关键超参

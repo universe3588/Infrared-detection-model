@@ -6,10 +6,17 @@ Modes:
   prune   : load teacher + keep masks -> build student -> save student init ckpt
   distill : distill/finetune student from teacher
   pipeline: score -> prune -> distill
+  eval    : fair re-eval teacher (+ optional student) with the SAME evaluate()/loader
 
 Example (after a trained teacher exists):
   python compress_train.py --mode pipeline --teacher_ckpt path/to/teacher.pth.tar \\
       --dataset IRSTD-1k --root ../RDANet-main/datasets --epochs 200
+
+Fair re-eval (解释学生暴涨):
+  python compress_train.py --mode eval \\
+      --teacher_ckpt result/.../mIoU__DNANet_*.pth.tar \\
+      --student_ckpt compress_runs/.../student_best.pth.tar \\
+      --dataset NUAA-SIRST --root ../RDANet-main/datasets
 """
 
 from __future__ import annotations
@@ -56,11 +63,11 @@ def str2bool(v):
 def parse_args():
     p = argparse.ArgumentParser(description="DNANet compression pipeline")
     p.add_argument("--mode", type=str, default="pipeline",
-                   choices=["score", "prune", "distill", "pipeline"])
+                   choices=["score", "prune", "distill", "pipeline", "eval"])
     p.add_argument("--teacher_ckpt", type=str, required=True,
                    help="teacher checkpoint (.pth.tar), state_dict or {'state_dict':...}")
     p.add_argument("--student_ckpt", type=str, default="",
-                   help="optional student init for distill mode")
+                   help="optional student ckpt (distill init, or eval fair compare)")
     p.add_argument("--scores_path", type=str, default="",
                    help="path to save/load importance scores .pt")
     p.add_argument("--keep_path", type=str, default="",
@@ -202,8 +209,93 @@ def evaluate(model, loader, device, deep_supervision=True):
         loss = SoftIoULoss(pred, labels)
         losses.update(loss.item(), pred.size(0))
         metric.update(pred, labels)
-    _, miou = metric.get()
-    return losses.avg, float(miou)
+    pixacc, miou = metric.get()
+    return losses.avg, float(miou), float(pixacc)
+
+
+def build_student_from_ckpt(ckpt_path, args, device, num_blocks):
+    """Rebuild narrowed DNANet from student_best.pth.tar (has nb_filter + state_dict)."""
+    ckpt = torch.load(ckpt_path, map_location="cpu")
+    if not isinstance(ckpt, dict) or "state_dict" not in ckpt:
+        raise ValueError(f"student ckpt must contain state_dict: {ckpt_path}")
+    nb_filter = ckpt.get("nb_filter")
+    if not nb_filter:
+        raise ValueError(f"student ckpt missing nb_filter: {ckpt_path}")
+    deep_sup = args.deep_supervision
+    model = DNANet(
+        num_classes=1,
+        input_channels=args.in_channels,
+        block=Res_CBAM_block,
+        num_blocks=num_blocks,
+        nb_filter=list(nb_filter),
+        deep_supervision=deep_sup,
+    )
+    state = {k.replace("module.", ""): v for k, v in ckpt["state_dict"].items()}
+    missing, unexpected = model.load_state_dict(state, strict=False)
+    if missing:
+        print("[warn] student missing keys:", missing[:8], "..." if len(missing) > 8 else "")
+    if unexpected:
+        print("[warn] student unexpected keys:", unexpected[:8], "..." if len(unexpected) > 8 else "")
+    model.to(device)
+    model.eval()
+    for p in model.parameters():
+        p.requires_grad_(False)
+    logged_best = ckpt.get("best_iou", None)
+    print(
+        f"[student] params={count_parameters(model):.3f}M  nb_filter={list(nb_filter)}"
+        + (f"  ckpt_best_iou={float(logged_best):.4f}" if logged_best is not None else "")
+    )
+    return model, list(nb_filter), logged_best
+
+
+def run_fair_eval(args, teacher, test_loader, device, work_dir, num_blocks):
+    """Same evaluate() for teacher and optional student; write JSON for paper defense."""
+    t_loss, t_iou, t_pix = evaluate(teacher, test_loader, device, args.deep_supervision)
+    print(f"[fair-eval][teacher] loss={t_loss:.4f} mIoU={t_iou:.4f} pixAcc={t_pix:.4f}")
+
+    result = {
+        "dataset": args.dataset,
+        "teacher_ckpt": args.teacher_ckpt,
+        "student_ckpt": args.student_ckpt or None,
+        "teacher_loss": t_loss,
+        "teacher_mIoU": t_iou,
+        "teacher_pixAcc": t_pix,
+        "student_loss": None,
+        "student_mIoU": None,
+        "student_pixAcc": None,
+        "student_ckpt_best_iou": None,
+        "delta_pp": None,
+        "note": "teacher/student evaluated with identical TestSetLoader + SoftIoU/mIoU in compress_train.evaluate",
+    }
+
+    if args.student_ckpt:
+        student, _, logged_best = build_student_from_ckpt(
+            args.student_ckpt, args, device, num_blocks,
+        )
+        s_loss, s_iou, s_pix = evaluate(student, test_loader, device, args.deep_supervision)
+        print(f"[fair-eval][student] loss={s_loss:.4f} mIoU={s_iou:.4f} pixAcc={s_pix:.4f}")
+        result["student_loss"] = s_loss
+        result["student_mIoU"] = s_iou
+        result["student_pixAcc"] = s_pix
+        result["student_ckpt_best_iou"] = float(logged_best) if logged_best is not None else None
+        result["delta_pp"] = (s_iou - t_iou) * 100.0
+        print(
+            f"[fair-eval][delta] student-teacher = {result['delta_pp']:+.2f} pp "
+            f"(student {s_iou:.4f} vs teacher {t_iou:.4f})"
+        )
+
+    out_json = os.path.join(work_dir, f"{args.dataset}_eval_metrics.json")
+    with open(out_json, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=2, ensure_ascii=False)
+    # also flat copy under --work_dir root for overnight summary scripts
+    flat_json = os.path.join(args.work_dir, f"{args.dataset}_eval_metrics.json")
+    if os.path.abspath(flat_json) != os.path.abspath(out_json):
+        os.makedirs(args.work_dir, exist_ok=True)
+        with open(flat_json, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        print(f"[save] fair eval (flat) -> {flat_json}")
+    print(f"[save] fair eval -> {out_json}")
+    return result
 
 
 def run_score(args, teacher, nb_filter, train_loader, device, work_dir):
@@ -307,7 +399,7 @@ def run_distill(args, teacher, student, train_loader, test_loader, device, work_
             tbar.set_description(f"Epoch {epoch} loss {losses.avg:.4f}")
 
         scheduler.step()
-        test_loss, miou = evaluate(student, test_loader, device, args.deep_supervision)
+        test_loss, miou, _pix = evaluate(student, test_loader, device, args.deep_supervision)
         print(f"[eval] epoch={epoch} test_loss={test_loss:.4f} mIoU={miou:.4f}")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"{epoch},{losses.avg:.6f},{test_loss:.6f},{miou:.6f}\n")
@@ -346,8 +438,13 @@ def main():
 
     train_loader, test_loader = build_loaders(args)
     teacher, nb_filter, num_blocks = build_teacher(args, device)
-    t_loss, t_iou = evaluate(teacher, test_loader, device, args.deep_supervision)
-    print(f"[teacher eval] loss={t_loss:.4f} mIoU={t_iou:.4f}")
+
+    if args.mode == "eval":
+        run_fair_eval(args, teacher, test_loader, device, work_dir, num_blocks)
+        return
+
+    t_loss, t_iou, t_pix = evaluate(teacher, test_loader, device, args.deep_supervision)
+    print(f"[teacher eval] loss={t_loss:.4f} mIoU={t_iou:.4f} pixAcc={t_pix:.4f}")
 
     keep_idx = None
     student = None
@@ -363,8 +460,8 @@ def main():
         if keep_idx is None:
             raise ValueError("keep masks required: run score first or pass --keep_path")
         student, _ = run_prune(args, teacher, num_blocks, keep_idx, device, work_dir)
-        s_loss, s_iou = evaluate(student, test_loader, device, args.deep_supervision)
-        print(f"[student init eval] loss={s_loss:.4f} mIoU={s_iou:.4f}")
+        s_loss, s_iou, s_pix = evaluate(student, test_loader, device, args.deep_supervision)
+        print(f"[student init eval] loss={s_loss:.4f} mIoU={s_iou:.4f} pixAcc={s_pix:.4f}")
 
     if args.mode in ("distill", "pipeline"):
         if student is None:
