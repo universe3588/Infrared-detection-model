@@ -24,10 +24,14 @@ def main():
     p.add_argument("--quantize", action="store_true", help="INT8 量化（需校准图列表）")
     p.add_argument("--dataset", type=str, default="configs/calib_list.txt",
                    help="每行一张校准图片路径（与 ONNX 输入分辨率一致）")
-    p.add_argument("--mean", type=float, nargs=3, default=[0.0, 0.0, 0.0])
-    p.add_argument("--std", type=float, nargs=3, default=[255.0, 255.0, 255.0],
-                   help="与训练归一化对齐；默认按 uint8/255 近似")
+    p.add_argument("--mean", type=float, nargs="+", default=[0.0, 0.0, 0.0],
+                   help="与 ONNX 输入通道数一致；SCTrans 灰度用: --mean 0")
+    p.add_argument("--std", type=float, nargs="+", default=[255.0, 255.0, 255.0],
+                   help="与训练归一化对齐；默认按 uint8/255 近似；SCTrans: --std 255")
     args = p.parse_args()
+    if len(args.mean) != len(args.std):
+        print(f"[error] mean/std 通道数不一致: {len(args.mean)} vs {len(args.std)}")
+        sys.exit(1)
 
     if not os.path.isfile(args.onnx):
         print(f"[error] ONNX not found: {args.onnx}")
