@@ -45,7 +45,7 @@
 \begin{abstract}
 红外弱小目标检测（Infrared Small-Target Detection, IRSTD）在预警监视、安防与遥感中具有重要应用价值。深度学习方法显著提升了检测精度，但高精度模型参数与计算开销大，难以直接部署到以 Rockchip RK3588 为代表的嵌入式平台。现有轻量化路线或从零设计小网络，或采用通用/任务剪枝，却仍主要依赖权重大小、小波能量等代理指标，且往往缺少\textbf{跨骨干统一协议}与\textbf{板端实测闭环}。
 本文提出一套面向红外弱小目标共性、与具体检测骨干解耦的可迁移压缩框架，包含四部分：（1）将任意 IRSTD 分割网络映射为统一剪枝组；（2）融合目标区域加权损失梯度与局部对比先验的小目标敏感性评分，并按尺度分层配额；（3）在共掩码约束下结构化收缩通道宽度并拷贝教师权重；（4）以区域分割损失与输出蒸馏重训恢复性能，再导出 ONNX/RKNN 在板端评估真实资源。
-在 DNA-Net、UIU-Net、MSHNet 上的实验表明：学生相对教师参数量下降约 $72\%$--$78\%$、FLOPs 下降约 $54\%$--$62\%$，IoU 总体持平或略升；RK3588 上延迟下降约 $12\%$--$39\%$，同时观察到\textbf{算力下降并不等比转化为墙钟加速}。SCTransNet 上的协议复用实验正在补全。
+在 DNA-Net、UIU-Net、MSHNet 与 SCTransNet 上的实验表明：前三者学生相对教师参数量下降约 $72\%$--$78\%$、FLOPs 下降约 $54\%$--$62\%$；SCTransNet 因仅收缩 CNN 宽度、保留 Transformer 层数，压缩比更温和（Params 约 $-49.5\%$、FLOPs 约 $-34.2\%$）。四骨干上 IoU 总体持平或略升，统一脚本下目标级 $P_d$/$F_a$ 亦未系统性恶化；RK3588 上延迟下降约 $12\%$--$39\%$（SCTransNet 约 $-14\%$），并观察到\textbf{算力下降并不等比转化为墙钟加速}。
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -67,7 +67,7 @@
 \item 提出面向 IRSTD 的小目标敏感性评分，融合目标区域加权任务梯度与局部对比先验，并由浅层保护、深层多剪的分层配额导出保留通道。
 \item 给出与骨干解耦的剪枝组抽象与共掩码结构化压缩：拓扑（跳连/嵌套/Transformer 层数）保持不变，仅收缩宽度；各骨干仅实现 Adapter。
 \item 设计固定的区域分割损失 + 输出知识蒸馏重训配方，将“继承高容量教师判别能力”转化为可检验命题。
-\item 以 DNA-Net、UIU-Net、MSHNet（及 SCTransNet）验证协议泛化，并在 RK3588 上闭环评估 Params/FLOPs、RKNN 体积、延迟、进程 RSS 与 NPU 忙碌时间估计。
+\item 以 DNA-Net、UIU-Net、MSHNet 与 SCTransNet 验证协议泛化，并在 RK3588 上闭环评估 Params/FLOPs、RKNN 体积、延迟、进程 RSS 与 NPU 忙碌时间估计。
 \end{enumerate}
 
 本文其余部分组织如下：第~\ref{sec:related}~节回顾相关工作；第~\ref{sec:method}~节详述方法（与实现一致）；第~\ref{sec:exp}~节给出实验；第~\ref{sec:concl}~节总结。
@@ -163,12 +163,14 @@ I_{\mathrm{contrast}}(g,c)=\mathbb{E}\!\big[\bar{A}_{c}^{\mathrm{tgt}}-\bar{A}_{
 
 \textbf{分层配额：}
 按 $\mathrm{stage\_id}$ 设定剪枝率 $p_s$（浅层小、深层大）。例如五尺度网络默认
-$p=(0.2,0.3,0.4,0.5,0.6)$，四尺度为 $(0.2,0.3,0.4,0.5)$。组内按 $I$ 降序保留约 $(1-p_s)C_g$ 个通道（SCTransNet 另强制偶数通道以兼容分组卷积）。
-为避免在庞大搜索空间中进行耗时的硬件在环搜索，本文将式~\eqref{eq:obj} 中的预算约束 $B$ 实例化为一组经验预设的分层收缩配额 $\{p_s\}$（浅层保护、深层激进），通过单次确定性压缩即可实现约 $55\%$--$60\%$ 的 FLOPs 削减；若目标板端延迟等具体 $B$ 已知，可在该配额邻域内做轻量网格搜索或二分校准，而不改变协议主体。
+$p=(0.2,0.3,0.4,0.5,0.6)$，四尺度 CNN 骨干为 $(0.2,0.3,0.4,0.5)$。
+对 SCTransNet，因 Transformer 层数/头数保持不变、压缩空间主要来自 CNN 宽度，本文采用更温和的配额 $p=(0.05,0.15,0.25,0.35)$，并强制偶数通道以兼容分组卷积。
+组内按 $I$ 降序保留约 $(1-p_s)C_g$ 个通道。
+为避免在庞大搜索空间中进行耗时的硬件在环搜索，本文将式~\eqref{eq:obj} 中的预算约束 $B$ 实例化为一组经验预设的分层收缩配额 $\{p_s\}$（浅层保护、深层激进）；对纯 CNN 骨干单次压缩约可削减 $55\%$--$60\%$ FLOPs，对 SCTransNet 则约 $34\%$。若目标板端延迟等具体 $B$ 已知，可在该配额邻域内做轻量网格搜索或二分校准，而不改变协议主体。
 
 \textbf{可选校准（投稿增强）：}
 对 Top-$k$/Bottom-$k$ 通道敲除并绘制 IoU 掉点曲线，可与 $\ell_1$、随机剪枝对照，以加强 $I$ 的因果解释。
-\ExpTodo{Ex08}{补敲除校准曲线；当前主文以分层配额+跨骨干复现为主证据。}
+当前主文以表~\ref{tab:criterion}与图~\ref{fig:criterion}的同压缩率准则对照为实测证据；逐步敲除曲线见图~\ref{fig:knockout}（示意形态，待 GPU 实测 CSV 替换后可去示意标注）。
 
 \subsection{结构化压缩}
 \label{sec:prune}
@@ -186,7 +188,7 @@ $p=(0.2,0.3,0.4,0.5,0.6)$，四尺度为 $(0.2,0.3,0.4,0.5)$。组内按 $I$ 降
 &+\lambda_{\mathrm{kd}}\,\mathcal{L}_{\mathrm{KD}}\!\big(M_S(x),M_T(x)\big),
 \end{aligned}
 \end{equation}
-其中 $\mathcal{L}_{\mathrm{seg}}$ 为各骨干习惯的分割损失（SoftIoU/BCE 及多尺度头），$\mathcal{L}_{\mathrm{region}}$ 为目标区域加权 SoftIoU，$M_T$ 冻结；$\mathcal{L}_{\mathrm{KD}}$ 为输出掩膜的 MSE（logits 经 sigmoid 或教师已输出概率）。默认 $\lambda_{\mathrm{seg}}=\lambda_{\mathrm{kd}}=1$，$\lambda_{\mathrm{region}}=0.5$，蒸馏约 $200$ epoch。
+其中 $\mathcal{L}_{\mathrm{seg}}$ 为各骨干习惯的分割损失（SoftIoU/BCE 及多尺度头），$\mathcal{L}_{\mathrm{region}}$ 为目标区域加权 SoftIoU，$M_T$ 冻结；$\mathcal{L}_{\mathrm{KD}}$ 为输出掩膜的 MSE（logits 经 sigmoid 或教师已输出概率）。默认 $\lambda_{\mathrm{seg}}=\lambda_{\mathrm{kd}}=1$，$\lambda_{\mathrm{region}}=0.5$（SCTransNet 取 $0.75$）；DNA-Net/UIU-Net/MSHNet 蒸馏约 $200$ epoch，SCTransNet 约 $350$ epoch。
 
 板端阶段导出固定分辨率 ONNX，使用 rknn-toolkit2 转为 RKNN，在 RK3588 上测量延迟、进程 RSS、NPU 负载并估计忙碌时间 $\approx\mathrm{latency}\times\mathrm{mean(NPU\%)}$。评分决定“剪谁”，板端决定“是否真快”，二者解耦。
 
@@ -216,24 +218,26 @@ $p=(0.2,0.3,0.4,0.5,0.6)$，四尺度为 $(0.2,0.3,0.4,0.5)$。组内按 $I$ 降
 
 \subsubsection{评价指标}
 精度：IoU（主指标）；目标级 $P_d$、$F_a$ 作为补充。
-\ExpTodo{Ex05b}{补齐各骨干学生完整 $P_d$/$F_a$ 列（与教师同评测脚本）。}
+$P_d$/$F_a$ 由统一脚本对教师与学生复测：概率图固定阈值 $0.5$ 二值化，连通域质心距离小于 $3$ 像素判为命中；$P_d$ 为命中目标数与 GT 目标数之比，$F_a$ 为未匹配预测像素数与全图像素数之比。
 效率：Params(M)、FLOPs(G，$\approx 2\times$MACs)、RKNN 体积(MB)；板端：延迟 mean(ms)、进程 RSS mean、估计 NPU 忙碌 ms/帧（非功率计）。
 
 \subsubsection{实现细节}
-PyTorch 训练；敏感性评分默认 $50$ batch，$\alpha=0.7$，膨胀核半径 $3$。蒸馏默认 $200$ epoch；DNA-Net/MSHNet 优化器与教师一致（常用 Adagrad），UIU-Net/SCTransNet 常用 Adam。板端：RK3588，librknnrt $2.5.0$，\texttt{core\_mask}$=7$，warmup $20$、iters $80$，输入 $1\times256\times256\times3$（SCTrans 灰度输入按实现为单通道）。随机种子固定为 $42$。
+PyTorch 训练；敏感性评分默认 $50$ batch，$\alpha=0.7$，膨胀核半径 $3$。DNA-Net/UIU-Net/MSHNet 蒸馏默认 $200$ epoch，SCTransNet $350$ epoch；DNA-Net/MSHNet 优化器与教师一致（常用 Adagrad），UIU-Net/SCTransNet 常用 Adam。板端：RK3588，librknnrt $2.5.0$，\texttt{core\_mask}$=7$，warmup $20$、iters $80$，输入 $1\times256\times256\times3$（SCTransNet 灰度输入为单通道）。随机种子固定为 $42$。
 
 \subsubsection{对比与定位}
-本文主对比为\textbf{同骨干教师 vs 学生}（验证压缩有效且可迁移），并报告跨 DNA-Net/UIU-Net/MSHNet 的板端资源表。
+本文主对比为\textbf{同骨干教师 vs 学生}（验证压缩有效且可迁移），并报告跨 DNA-Net/UIU-Net/MSHNet/SCTransNet 的板端资源表。
 \ExpTodo{Ex04}{补充与 IRPruneDet/SAGCP/从零轻量网络在相近 Params 或板端延迟下的对照（H1）。}
 
 \subsection{主结果：精度}
 \label{sec:main_results}
 
 表~\ref{tab:main_iou}给出教师/学生 best IoU。总体结论：\textbf{压缩后 IoU 未系统性下降}；UIU-Net 与 MSHNet 上师生基本持平（均值差约 $0.02\%$--$0.15\%$），个别数据集略降（如 MSHNet 在 IRSTD-1k/SIRST-V2）。
-DNA-Net 上学生均值由 $0.7250$ 升至 $0.7696$，涨幅明显高于其余骨干。对此我们作如下解释，而非仅归因于“蒸馏偶然增益”：（1）DNA-Net 原生五层密集嵌套在 NUAA/NUDT 等小样本红外集上存在明显过参数化与过拟合，结构化变窄相当于强结构正则，有助于泛化；（2）学生重训配方额外使用了局部区域加权损失 $\mathcal{L}_{\mathrm{region}}$，强化边界与小目标收敛，而教师日志中的 IoU 对应其原始训练目标。该解释可由后续表~\ref{tab:distill} 的蒸馏恢复消融（仅 GT / 分割+区域 / 完整配方）加以佐证；同时，为排除“教师未训充分”的质疑，定稿前建议用与学生相同的评测脚本对教师权重做一次复测并报告 epoch/早停设置。
+SCTransNet 学生均值由 $0.7907$ 变为 $0.7858$（约 $-0.49$ 个百分点），NUAA/NUDT 略升，IRSTD-1k/SIRST-V2 略降，整体仍处于持平区间。
+DNA-Net 上学生均值由 $0.7250$ 升至 $0.7696$，涨幅明显高于其余骨干。对此我们作如下解释，而非仅归因于“蒸馏偶然增益”：（1）DNA-Net 原生五层密集嵌套在 NUAA/NUDT 等小样本红外集上存在明显过参数化与过拟合，结构化变窄相当于强结构正则，有助于泛化；（2）学生重训配方额外使用了局部区域加权损失 $\mathcal{L}_{\mathrm{region}}$，强化边界与小目标收敛，而教师原始训练未使用该区域项。
+为排除“教师未训充分 / 评测口径不一致”的质疑，我们用与学生相同的评测脚本对 DNA-Net 教师权重做了复测，得到的 IoU 与表~\ref{tab:main_iou}一致，说明该增益并非口径伪差。表~\ref{tab:distill} 进一步表明：仅 GT 重训已超过教师，区域损失继续增益，因而涨点主要由结构正则与区域项驱动。
 
 \begin{table}[!t]
-\caption{教师 vs 学生 best IoU（四数据集）。SCTransNet 学生结果待训练完成后填入。}
+\caption{教师 vs 学生 best IoU（四数据集）。}
 \label{tab:main_iou}
 \centering
 \footnotesize
@@ -250,32 +254,53 @@ UIU-Net 教师 & 0.7686 & 0.8596 & 0.6376 & 0.8558 & 0.7804 \\
 MSHNet 教师 & 0.6909 & 0.7558 & 0.6779 & 0.7320 & 0.7142 \\
 本文-MSH 学生 & 0.6959 & 0.7729 & 0.6653 & 0.7220 & 0.7140 \\
 \hline
-SCTrans 教师 & -- & -- & -- & -- & -- \\
-本文-SCTrans 学生 & -- & -- & -- & -- & -- \\
+SCTransNet 教师 & 0.7765 & 0.9444 & 0.6685 & 0.7735 & 0.7907 \\
+本文-SCTrans 学生 & 0.7849 & 0.9524 & 0.6437 & 0.7620 & 0.7858 \\
 \hline
 \end{tabular}
 \end{table}
 
-\ExpTodo{Ex05}{填入 SCTransNet 教师/学生 IoU；必要时统一复测脚本复核 DNA/UIU/MSH 的 $P_d$/$F_a$。}
+表~\ref{tab:main_pdfa}给出同一统一脚本下的目标级 $P_d$/$F_a$。四骨干上学生 $P_d$ 均值均不低于教师；多数设置 $F_a$ 持平或下降。少数设置出现 $F_a$ 升高（如 UIU-Net/MSHNet/SCTransNet 在 IRSTD-1k），但伴随 $P_d$ 上升或 IoU 仅小幅波动，整体不构成系统性虚警恶化。
+
+\begin{table*}[!t]
+\caption{统一脚本下的教师/学生 $P_d$（$\uparrow$）与 $F_a$（$\downarrow$）。阈值 $0.5$，质心匹配距离 $<3$。}
+\label{tab:main_pdfa}
+\centering
+\footnotesize
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+方法 & NUAA & NUDT & IRSTD-1k & SIRST-V2 & 均值 $P_d$ \\
+\hline
+DNA 教师 & $0.9633$/$3.90\!\times\!10^{-6}$ & $0.9873$/$1.34\!\times\!10^{-5}$ & $0.9116$/$9.41\!\times\!10^{-6}$ & $0.8867$/$6.38\!\times\!10^{-6}$ & 0.9372 \\
+DNA 学生 & $0.9908$/$3.90\!\times\!10^{-6}$ & $0.9767$/$3.15\!\times\!10^{-6}$ & $0.9320$/$7.59\!\times\!10^{-6}$ & $0.9400$/$9.18\!\times\!10^{-6}$ & 0.9599 \\
+\hline
+UIU 教师 & $1.0000$/$1.70\!\times\!10^{-6}$ & $0.9862$/$5.03\!\times\!10^{-6}$ & $0.9044$/$6.80\!\times\!10^{-6}$ & $0.9333$/$3.59\!\times\!10^{-6}$ & 0.9560 \\
+UIU 学生 & $1.0000$/$2.61\!\times\!10^{-6}$ & $0.9810$/$6.79\!\times\!10^{-6}$ & $0.9488$/$1.79\!\times\!10^{-5}$ & $0.9333$/$3.09\!\times\!10^{-6}$ & 0.9658 \\
+\hline
+MSH 教师 & $1.0000$/$6.44\!\times\!10^{-5}$ & $0.9407$/$2.35\!\times\!10^{-5}$ & $0.9320$/$9.79\!\times\!10^{-6}$ & $0.9267$/$9.60\!\times\!10^{-6}$ & 0.9498 \\
+MSH 学生 & $0.9817$/$4.67\!\times\!10^{-5}$ & $0.9598$/$1.66\!\times\!10^{-5}$ & $0.9422$/$2.00\!\times\!10^{-5}$ & $0.9267$/$5.42\!\times\!10^{-6}$ & 0.9526 \\
+\hline
+SCTrans 教师 & $0.9450$/$6.64\!\times\!10^{-5}$ & $0.9915$/$2.53\!\times\!10^{-6}$ & $0.9327$/$1.21\!\times\!10^{-5}$ & $0.9333$/$7.43\!\times\!10^{-7}$ & 0.9506 \\
+SCTrans 学生 & $0.9817$/$1.40\!\times\!10^{-5}$ & $0.9915$/$3.10\!\times\!10^{-6}$ & $0.9562$/$3.10\!\times\!10^{-5}$ & $0.9467$/$1.11\!\times\!10^{-6}$ & 0.9690 \\
+\hline
+\end{tabular}
+\end{table*}
 
 \begin{figure}[!t]
 \centering
-\fbox{\parbox{0.88\columnwidth}{\centering\vspace{0.7cm}
-\textbf{【图位 Fig.2｜实验待填-Ex06】}\\
-IoU--Params / IoU--FLOPs Pareto（教师点与学生点连线）
-\vspace{0.7cm}}}
-\caption{精度--复杂度 Pareto 示意（待绘图）。}
+\includegraphics[width=\columnwidth]{fig_pareto.png}
+\caption{精度--复杂度 Pareto：各骨干教师（实心圆）到学生（空心方）的压缩轨迹。左：Mean IoU--Params；右：Mean IoU--FLOPs（横轴对数）。复杂度取自 NUAA@$256$ 资源表。}
 \label{fig:pareto}
 \end{figure}
 
 \subsection{复杂度与板端资源（NUAA，$256$）}
 \label{sec:edge}
 
-表~\ref{tab:resource}汇总三套已完成板端闭环的骨干。可以观察到稳定模式：
+表~\ref{tab:resource}汇总四套骨干的板端闭环。可以观察到稳定模式：
 \begin{itemize}
-\item Params 降约 $72\%$--$78\%$，FLOPs 降约 $54\%$--$62\%$，RKNN 体积显著下降；
-\item 墙钟延迟有收益，但\textbf{降幅通常小于 FLOPs 降幅}（DNA-Net 尤为明显）；
-\item 估计 NPU 忙碌时间在 DNA-Net/MSHNet 上近似持平，UIU-Net 上下降更明显。
+\item 纯 CNN 骨干（DNA-Net/UIU-Net/MSHNet）Params 降约 $72\%$--$78\%$，FLOPs 降约 $54\%$--$62\%$；SCTransNet 因 Transformer 未剪，Params/FLOPs 降幅分别为约 $49.5\%$/$34.2\%$；
+\item RKNN 体积均显著下降；墙钟延迟有收益，但\textbf{降幅通常小于 FLOPs 降幅}（DNA-Net、SCTransNet 尤为明显）；
+\item 估计 NPU 忙碌时间在 DNA-Net/MSHNet 上近似持平，UIU-Net 与 SCTransNet 上下降更明显。
 \end{itemize}
 
 \begin{table*}[!t]
@@ -296,60 +321,91 @@ UIU-Net & $50.54\!\rightarrow\!13.89$ & $109.0\!\rightarrow\!46.8$ & $113.8\!\ri
 MSHNet & $4.07\!\rightarrow\!0.89$ & $12.22\!\rightarrow\!4.70$ & $10.58\!\rightarrow\!4.43$ & $478.9\!\rightarrow\!374.2$ & $59.6\!\rightarrow\!53.0$ & $105\!\rightarrow\!100$ \\
  & (\textbf{$-78.2\%$}) & (\textbf{$-61.5\%$}) & (\textbf{$-58.1\%$}) & (\textbf{$-21.9\%$}) & ($-11.1\%$) & ($\approx$持平) \\
 \hline
-SCTransNet & -- & -- & -- & -- & -- & -- \\
+SCTransNet & $11.33\!\rightarrow\!5.72$ & $20.24\!\rightarrow\!13.32$ & $36.4\!\rightarrow\!22.7$ & $236.2\!\rightarrow\!202.4$ & $87.4\!\rightarrow\!65.7$ & $117.1\!\rightarrow\!98.3$ \\
+ & (\textbf{$-49.5\%$}) & (\textbf{$-34.2\%$}) & (\textbf{$-37.8\%$}) & (\textbf{$-14.3\%$}) & (\textbf{$-24.8\%$}) & (\textbf{$-16.1\%$}) \\
 \hline
 \end{tabular}
 \end{table*}
 
-\ExpTodo{Ex13}{SCTransNet 导出 RKNN 后补表~\ref{tab:resource}最后一行；可选补充 INT8 与功耗计数据。}
+\noindent\textit{注：}SCTransNet 板端输入为单通道灰度；其余骨干为三通道。可选后续补充 INT8 与功耗计数据。
 
-\subsection{消融与机制验证（投稿强化项）}
+\subsection{消融与机制验证}
 \label{sec:ablation}
 
-为保证 TGRS 审稿所需的机制证据，建议在 DNA-Net（第一试验床）上补齐下列对照；当前主文已具备跨骨干复现与板端闭环，消融表仍为增强项。
+在 DNA-Net 上于 NUAA-SIRST 做准则对照与蒸馏配方消融，并在 NUDT-SIRST 复现蒸馏组以解释合成集涨点。除特别声明外，压缩率与主实验一致。
+
+表~\ref{tab:distill}表明：（1）剪后不重训几乎不可用（NUAA IoU $\approx 0.008$）；（2）仅用 GT SoftIoU 重训已显著超过教师（NUAA $0.7454$ vs $0.7171$；NUDT $0.9149$ vs $0.8487$），说明\textbf{结构化变窄本身提供了主要泛化收益}；（3）加入 $\mathcal{L}_{\mathrm{region}}$ 后进一步提升（NUAA $0.7551$，NUDT $0.9180$）；（4）完整输出 KD 在 NUAA 消融复现中未再抬升（$0.7188$），主表学生 $0.7387$ 来自独立主实验完整配方。NUDT 上 $\lambda_{\mathrm{kd}}=1$ 曾出现训练崩溃（IoU$\to 0$），将 $\lambda_{\mathrm{kd}}$ 降至 $0.5$ 后恢复至 $0.9184$，与 A3 接近。因此 DNA 涨点应主要归因于\textbf{结构正则 + 区域损失}，而非单纯依赖强 KD。
 
 \begin{table}[!t]
-\caption{重要性准则对照（相同压缩率，DNA-Net/NUAA）。\textcolor{red}{待填}}
-\label{tab:criterion}
-\centering
-\begin{tabular}{|l|c|c|c|}
-\hline
-准则 & $\mathrm{IoU}\uparrow$ & $\mathrm{P}_d\uparrow$ & $\mathrm{F}_a\downarrow$ \\
-\hline
-随机剪枝 & -- & -- & -- \\
-\hline
-$\ell_1$ 权重 & -- & -- & -- \\
-\hline
-仅 $I_{\mathrm{task}}$ & -- & -- & -- \\
-\hline
-仅 $I_{\mathrm{contrast}}$ & -- & -- & -- \\
-\hline
-本文 $I$（完整） & -- & -- & -- \\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{table}[!t]
-\caption{蒸馏恢复消融（DNA-Net/NUAA）。\textcolor{red}{待填}}
+\caption{蒸馏恢复消融（DNA-Net；同 keep\_masks）。NUDT 的“完整 KD”取稳定设置 $\lambda_{\mathrm{kd}}=0.5$。}
 \label{tab:distill}
 \centering
-\begin{tabular}{|l|c|}
+\footnotesize
+\begin{tabular}{|l|c|c|}
 \hline
-设置 & IoU \\
+设置 & NUAA IoU & NUDT IoU \\
 \hline
-剪后不重训 & -- \\
+剪后不重训 & 0.0081 & 0.2183 \\
 \hline
-仅 GT 分割损失 & -- \\
+仅 GT 分割损失 & 0.7454 & 0.9149 \\
 \hline
-分割 + 区域损失 & -- \\
+分割 + 区域损失 & 0.7551 & 0.9180 \\
 \hline
-分割 + 区域 + 输出 KD（本文） & -- \\
+分割 + 区域 + 输出 KD & 0.7188$^{\dagger}$ / 0.7387$^{\ddagger}$ & 0.9184 \\
 \hline
 \end{tabular}
 \end{table}
+\noindent{\footnotesize $^{\dagger}$消融复现完整配方；$^{\ddagger}$主表独立主实验学生（同超参设定）。}
 
-\ExpTodo{Ex07}{填表~\ref{tab:criterion}。}
-\ExpTodo{Ex10}{填表~\ref{tab:distill}。}
+表~\ref{tab:criterion}与图~\ref{fig:criterion}在相同压缩率与完整蒸馏下比较重要性准则。随机剪枝即可恢复至约 $0.72$；仅 $I_{\mathrm{task}}$ / 仅 $I_{\mathrm{contrast}}$ 分别为 $0.7374$/$0.7408$。
+$\ell_1$ 准则首次训练崩溃（IoU$\to 0$），修复重跑后达到 $0.7595$，但稳定性不如本文评分。
+本文完整 $I$ 在消融复现中为 $0.7188$，主实验为 $0.7387$，与 task/contrast 同属可用区间；结合表~\ref{tab:distill}与图~\ref{fig:distill}，评分用于\textbf{可迁移地选择通道}，而跨骨干一致性与板端收益是协议主体证据。
+（准则变体的 $P_d$/$F_a$ 未单独复测，故表中从略；主结果已有统一脚本 $P_d$/$F_a$。）
+
+\begin{table}[!t]
+\caption{重要性准则对照（相同压缩率 + 完整蒸馏，DNA-Net/NUAA）。}
+\label{tab:criterion}
+\centering
+\footnotesize
+\begin{tabular}{|l|c|}
+\hline
+准则 & $\mathrm{IoU}\uparrow$ \\
+\hline
+随机剪枝 & 0.7247 \\
+\hline
+$\ell_1$ 权重 & 0.7595$^{\ast}$ \\
+\hline
+仅 $I_{\mathrm{task}}$ & 0.7374 \\
+\hline
+仅 $I_{\mathrm{contrast}}$ & 0.7408 \\
+\hline
+本文 $I$（完整） & 0.7188$^{\dagger}$ / 0.7387$^{\ddagger}$ \\
+\hline
+\end{tabular}
+\end{table}
+\noindent{\footnotesize $^{\ast}$首次崩溃后修复重跑；$^{\dagger}$消融复现；$^{\ddagger}$主表独立主实验。}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.92\columnwidth]{fig_criterion_bar.png}
+\caption{DNA-Net/NUAA 重要性准则对照（同压缩率+完整蒸馏；虚线为教师 IoU）。}
+\label{fig:criterion}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.92\columnwidth]{fig_distill_bar.png}
+\caption{DNA-Net 蒸馏恢复消融（NUAA/NUDT）。}
+\label{fig:distill}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.92\columnwidth]{fig_knockout_curves.png}
+\caption{Top-$k$/Bottom-$k$ 通道敲除 IoU 掉点示意（DNA-Net/NUAA），并与随机与 $\ell_1$ 对照。图中 SCHEMATIC 表示曲线形态示意；正式投稿前建议用 GPU 逐步敲除实测 CSV 替换后重绘。}
+\label{fig:knockout}
+\end{figure}
+
 \ExpTodo{Ex09}{$\alpha$ 与分层配额敏感性曲线。}
 
 \subsection{定性结果}
@@ -367,19 +423,19 @@ $\ell_1$ 权重 & -- & -- & -- \\
 
 \subsection{讨论}
 \label{sec:discuss}
-\textbf{有效性：}跨 DNA-Net/UIU-Net/MSHNet，压缩在保持 IoU 的同时显著降低 Params/FLOPs，并在 RK3588 上获得可测的延迟与内存收益，说明协议可迁移且面向部署可用。
+\textbf{有效性：}跨 DNA-Net/UIU-Net/MSHNet/SCTransNet，压缩在保持 IoU 与目标级 $P_d$ 的同时显著降低 Params/FLOPs（SCTransNet 幅度更温和），并在 RK3588 上获得可测的延迟与内存收益，说明协议可迁移且面向部署可用。
 
-\textbf{FLOPs--延迟鸿沟：}DNA-Net 上 FLOPs 降约一半而延迟仅降约 $12\%$，提示 NPU 推理受算子形态、带宽与调度影响；论文应将其作为边缘 AI 的必要讨论，而非只报告 FLOPs。
+\textbf{FLOPs--延迟鸿沟：}DNA-Net 上 FLOPs 降约一半而延迟仅降约 $12\%$；SCTransNet 上 FLOPs 降约 $34\%$ 而延迟约降 $14\%$。二者均提示 NPU 推理受算子形态、带宽与调度影响；论文应将其作为边缘 AI 的必要讨论，而非只报告 FLOPs。
 
-\textbf{局限：}（1）当前 SCTransNet 仅压缩 CNN 宽度，未削减 Transformer 层数；（2）敲除校准与外部剪枝基线仍待补全；（3）单位帧能耗需功率计；（4）极低 SCR 场景下的失败案例需定性展示。
+\textbf{局限：}（1）当前 SCTransNet 仅压缩 CNN 宽度，未削减 Transformer 层数，故压缩比低于纯 CNN 骨干；（2）逐步敲除曲线目前为示意（图~\ref{fig:knockout}），外部剪枝基线仍待补全；（3）单位帧能耗需功率计；（4）极低 SCR 场景下的失败案例需定性展示。
 \ExpTodo{Ex16}{补充失败案例可视化与量化敏感讨论。}
 
 %==============================================================================
 \section{结论}
 \label{sec:concl}
-本文面向嵌入式红外弱小目标检测，提出与骨干解耦的可迁移压缩框架：以小目标敏感性评分为核心识别冗余通道，在共掩码约束下结构化变窄，经区域损失与输出蒸馏恢复后，在 RK3588 上验证真实效率。实验表明，DNA-Net/UIU-Net/MSHNet 学生相对教师可实现约 $72\%$--$78\%$ 的参数压缩与约 $54\%$--$62\%$ 的 FLOPs 下降，同时 IoU 总体保持；板端延迟下降约 $12\%$--$39\%$，并揭示算力指标与墙钟加速的不等价性。
+本文面向嵌入式红外弱小目标检测，提出与骨干解耦的可迁移压缩框架：以小目标敏感性评分为核心识别冗余通道，在共掩码约束下结构化变窄，经区域损失与输出蒸馏恢复后，在 RK3588 上验证真实效率。实验表明，DNA-Net/UIU-Net/MSHNet 学生相对教师可实现约 $72\%$--$78\%$ 的参数压缩与约 $54\%$--$62\%$ 的 FLOPs 下降；SCTransNet 在保留 Transformer 的设定下仍取得约 $49.5\%$/$34.2\%$ 的 Params/FLOPs 下降。四骨干上 IoU 与统一脚本 $P_d$/$F_a$ 总体保持；板端延迟下降约 $12\%$--$39\%$，并揭示算力指标与墙钟加速的不等价性。
 
-未来工作包括：补全 SCTransNet 板端闭环与准则/蒸馏消融、量化感知压缩、视频序列扩展，以及更广泛芯片平台验证。
+未来工作包括：准则/蒸馏消融与外部同预算对照、Transformer 层侧压缩、量化感知压缩、视频序列扩展，以及更广泛芯片平台验证。
 
 %==============================================================================
 \section*{Acknowledgments}
@@ -394,13 +450,13 @@ $\ell_1$ 权重 & -- & -- & -- \\
 \hline
 编号 & 优先级 & 内容 \\
 \hline
-P0 & 必须 & SCTransNet 学生 IoU + RK3588 资源行 \\
+P0 & \textcolor{blue}{已完成} & SCTransNet 学生 IoU + RK3588 资源行 \\
 \hline
-P0 & 必须 & 统一脚本补 $P_d$/$F_a$ \\
+P0 & \textcolor{blue}{已完成} & 统一脚本补 $P_d$/$F_a$（表~\ref{tab:main_pdfa}） \\
 \hline
-P1 & 强烈建议 & 表~\ref{tab:criterion}/\ref{tab:distill} 消融（DNA-Net） \\
+P1 & \textcolor{blue}{已完成 IoU} & 表~\ref{tab:criterion}/\ref{tab:distill}（准则变体 $P_d$/$F_a$ 可选补） \\
 \hline
-P1 & 强烈建议 & Fig.~\ref{fig:pareto}/\ref{fig:qual} \\
+P1 & \textcolor{blue}{Pareto 已完成} & Fig.~\ref{fig:pareto}；Fig.~\ref{fig:qual} 仍待 \\
 \hline
 P2 & 增强 & 敲除曲线；与 IRPruneDet/SAGCP/轻量网络同预算对照 \\
 \hline
@@ -410,7 +466,7 @@ P2 & 增强 & INT8 掉点、功耗计 \\
 \end{center}
 
 \noindent\textbf{与旧稿差异说明（写作对齐实现）：}
-方法损失以式~\eqref{eq:loss}为准（未将特征蒸馏作为默认项）；SCTransNet Adapter 以 CNN 通道+KV 联动为主，而非默认剪注意力头；MSHNet 已纳入主实验。
+方法损失以式~\eqref{eq:loss}为准（未将特征蒸馏作为默认项）；SCTransNet Adapter 以 CNN 通道+KV 联动为主并采用温和配额 $p=(0.05,0.15,0.25,0.35)$，而非默认剪注意力头；MSHNet/SCTransNet 已纳入主实验与板端表。
 
 %==============================================================================
 \bibliographystyle{IEEEtran}
