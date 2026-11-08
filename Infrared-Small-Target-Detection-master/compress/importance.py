@@ -142,3 +142,36 @@ def choose_keep_indices(
         keep_idx[s] = topk
         print(f"[keep] stage{s}: keep {k}/{c} (prune_rate={rate})")
     return keep_idx
+
+
+@torch.no_grad()
+def l1_weight_scores(model: nn.Module, adapter: DNANetAdapter, device="cpu") -> Dict[str, torch.Tensor]:
+    """Per-stage channel score = mean |conv2.weight| over hooked Res_CBAM blocks."""
+    widths = adapter.nb_filter
+    hook_modules = adapter.get_hook_modules(model)
+    scores = {}
+    for stage, modules in hook_modules.items():
+        acc = torch.zeros(widths[stage], device=device)
+        used = 0
+        for m in modules:
+            w = m.conv2.weight.detach().abs().mean(dim=(1, 2, 3)).to(device)
+            if w.numel() != widths[stage]:
+                continue
+            acc = acc + w
+            used += 1
+        if used == 0:
+            acc = torch.rand(widths[stage], device=device)
+        else:
+            acc = acc / used
+        scores[f"stage{stage}"] = acc.detach().cpu()
+        print(f"[score-l1] stage{stage} C={widths[stage]} mean={acc.mean().item():.6f}")
+    return scores
+
+
+def random_scores(adapter: DNANetAdapter, seed: int = 42) -> Dict[str, torch.Tensor]:
+    g = torch.Generator().manual_seed(int(seed))
+    scores = {}
+    for stage, width in enumerate(adapter.nb_filter):
+        scores[f"stage{stage}"] = torch.rand(width, generator=g)
+        print(f"[score-random] stage{stage} C={width} seed={seed}")
+    return scores

@@ -34,7 +34,12 @@ from torchvision import transforms
 from tqdm import tqdm
 
 from compress.adapters.dnanet_adapter import DNANetAdapter
-from compress.importance import ImportanceEstimator, choose_keep_indices
+from compress.importance import (
+    ImportanceEstimator,
+    choose_keep_indices,
+    l1_weight_scores,
+    random_scores,
+)
 from compress.losses import (
     RegionSoftIoULoss,
     kd_logits_loss,
@@ -100,6 +105,11 @@ def parse_args():
     p.add_argument("--score_batches", type=int, default=50)
     p.add_argument("--alpha", type=float, default=0.7)
     p.add_argument("--dilate", type=int, default=3)
+    p.add_argument(
+        "--prune_criterion", type=str, default="full",
+        choices=["full", "task", "contrast", "random", "l1"],
+        help="channel ranking: full=I(alpha), task/contrast, random, l1(|W|)",
+    )
     p.add_argument("--prune_rates", type=str, default="0.20,0.30,0.40,0.50,0.60",
                    help="per-stage prune ratios stage0..stage4")
     p.add_argument("--min_keep", type=int, default=4)
@@ -114,6 +124,7 @@ def parse_args():
     p.add_argument("--lambda_region", type=float, default=0.5,
                    help="extra region SoftIoU weight on student")
     p.add_argument("--gpus", type=str, default="0")
+    p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
 
@@ -300,19 +311,37 @@ def run_fair_eval(args, teacher, test_loader, device, work_dir, num_blocks):
 
 def run_score(args, teacher, nb_filter, train_loader, device, work_dir):
     adapter = DNANetAdapter(nb_filter)
-    # enable grads temporarily for weight.grad scoring
-    for p in teacher.parameters():
-        p.requires_grad_(True)
-    estimator = ImportanceEstimator(
-        adapter, alpha=args.alpha, dilate=args.dilate, max_batches=args.score_batches,
-    )
-    scores = estimator.estimate(teacher, train_loader, device=device)
-    for p in teacher.parameters():
-        p.requires_grad_(False)
-    teacher.eval()
+    criterion = getattr(args, "prune_criterion", "full")
+    print(f"[score] prune_criterion={criterion} alpha={args.alpha}")
+
+    if criterion == "random":
+        scores = random_scores(adapter, seed=args.seed if hasattr(args, "seed") else 42)
+    elif criterion == "l1":
+        scores = l1_weight_scores(teacher, adapter, device=device)
+    else:
+        # full / task / contrast via alpha
+        alpha = args.alpha
+        if criterion == "task":
+            alpha = 1.0
+        elif criterion == "contrast":
+            alpha = 0.0
+        for p in teacher.parameters():
+            p.requires_grad_(True)
+        estimator = ImportanceEstimator(
+            adapter, alpha=alpha, dilate=args.dilate, max_batches=args.score_batches,
+        )
+        scores = estimator.estimate(teacher, train_loader, device=device)
+        for p in teacher.parameters():
+            p.requires_grad_(False)
+        teacher.eval()
 
     scores_path = args.scores_path or os.path.join(work_dir, "scores.pt")
-    torch.save({"scores": scores, "nb_filter": nb_filter}, scores_path)
+    torch.save({
+        "scores": scores,
+        "nb_filter": nb_filter,
+        "prune_criterion": criterion,
+        "alpha": args.alpha,
+    }, scores_path)
     print(f"[save] scores -> {scores_path}")
 
     rates = [float(x) for x in args.prune_rates.split(",")]
@@ -323,6 +352,7 @@ def run_score(args, teacher, nb_filter, train_loader, device, work_dir):
         "nb_filter": nb_filter,
         "prune_rates": rates,
         "alpha": args.alpha,
+        "prune_criterion": criterion,
         "dataset": args.dataset,
     })
     return scores_path, keep_path, keep_idx
