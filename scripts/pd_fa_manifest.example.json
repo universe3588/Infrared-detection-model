@@ -1,0 +1,53 @@
+{
+  "_comment": "可选。不传 --manifest 时脚本会自动发现最新 teacher/student。需要覆盖时复制为 pd_fa_manifest.json 再改路径。",
+  "jobs": [
+    {
+      "backbone": "dna",
+      "dataset": "NUAA-SIRST",
+      "role": "teacher",
+      "ckpt": "Infrared-Small-Target-Detection-master/result/NUAA-SIRST_DNANet_14_10_2026_11_07_43_wDS/mIoU__DNANet_NUAA-SIRST_epoch.pth.tar"
+    },
+    {
+      "backbone": "dna",
+      "dataset": "NUAA-SIRST",
+      "role": "student",
+      "ckpt": "Infrared-Small-Target-Detection-master/compress_runs/NUAA-SIRST_pipeline_20261029_181406/student_best.pth.tar"
+    },
+    {
+      "backbone": "uiu",
+      "dataset": "NUAA-SIRST",
+      "role": "teacher",
+      "ckpt": "IEEE_TIP_UIU-Net-main/saved_models/uiunet_irstd/NUAA-SIRST_20261030_151749/uiunet_best.pth.tar"
+    },
+    {
+      "backbone": "uiu",
+      "dataset": "NUAA-SIRST",
+      "role": "student",
+      "ckpt": "IEEE_TIP_UIU-Net-main/compress_runs/NUAA-SIRST_pipeline_20261104_143259/student_best.pth.tar"
+    },
+    {
+      "backbone": "msh",
+      "dataset": "NUAA-SIRST",
+      "role": "teacher",
+      "ckpt": "MSHNet-main/weight/MSHNet-NUAA-SIRST-2026-11-01-21-56-52/weight.pkl"
+    },
+    {
+      "backbone": "msh",
+      "dataset": "NUAA-SIRST",
+      "role": "student",
+      "ckpt": "MSHNet-main/compress_runs/NUAA-SIRST_pipeline_YYYYMMDD_HHMMSS/student_best.pth.tar"
+    },
+    {
+      "backbone": "sctrans",
+      "dataset": "NUAA-SIRST",
+      "role": "teacher",
+      "ckpt": "SCTransNet-main/log/NUAA-SIRST/SCTransNet_781_best.pth.tar"
+    },
+    {
+      "backbone": "sctrans",
+      "dataset": "NUAA-SIRST",
+      "role": "student",
+      "ckpt": "SCTransNet-main/compress_runs/NUAA-SIRST_pipeline_YYYYMMDD_HHMMSS/student_best.pth.tar"
+    }
+  ]
+}
