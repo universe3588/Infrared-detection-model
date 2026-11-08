@@ -1,0 +1,363 @@
+[
+  {
+    "backbone": "dna",
+    "dataset": "NUAA-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/result/NUAA-SIRST_DNANet_14_10_2026_11_07_43_wDS/mIoU__DNANet_NUAA-SIRST_epoch.pth.tar",
+    "Pd": 0.963302752293578,
+    "Fa": 3.903411155523256e-06,
+    "IoU": 0.71712652249565,
+    "n_images": 86,
+    "seconds": 2.9980008602142334,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 105.0,
+      "fa_pixels": 22.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "NUAA-SIRST",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/compress_runs/NUAA-SIRST_pipeline_20261029_181406/student_best.pth.tar",
+    "Pd": 0.9908256880733946,
+    "Fa": 3.903411155523256e-06,
+    "IoU": 0.7387070597781985,
+    "n_images": 86,
+    "seconds": 2.0994884967803955,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 108.0,
+      "fa_pixels": 22.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "NUDT-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/result/NUDT-SIRST_DNANet_14_10_2026_13_20_32_wDS/mIoU__DNANet_NUDT-SIRST_epoch.pth.tar",
+    "Pd": 0.9873015873015873,
+    "Fa": 1.3397400637707079e-05,
+    "IoU": 0.8487613661922051,
+    "n_images": 664,
+    "seconds": 14.993149042129517,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 945.0,
+      "pd_hits": 933.0,
+      "fa_pixels": 583.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "NUDT-SIRST",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/compress_runs/NUDT-SIRST_pipeline_20261030_133454/student_best.pth.tar",
+    "Pd": 0.9767195767195768,
+    "Fa": 3.1482742493411146e-06,
+    "IoU": 0.9225562618106854,
+    "n_images": 664,
+    "seconds": 14.854495763778687,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 945.0,
+      "pd_hits": 923.0,
+      "fa_pixels": 137.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "IRSTD-1k",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/result/IRSTD-1k_DNANet_14_10_2026_18_22_49_wDS/mIoU__DNANet_IRSTD-1k_epoch.pth.tar",
+    "Pd": 0.9115646258503401,
+    "Fa": 9.41338230721393e-06,
+    "IoU": 0.6229958772331654,
+    "n_images": 201,
+    "seconds": 6.023871421813965,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 294.0,
+      "pd_hits": 268.0,
+      "fa_pixels": 124.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "IRSTD-1k",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/compress_runs/IRSTD-1k_pipeline_20261029_191747/student_best.pth.tar",
+    "Pd": 0.9319727891156463,
+    "Fa": 7.591437344527363e-06,
+    "IoU": 0.6706049149338374,
+    "n_images": 201,
+    "seconds": 5.883609294891357,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 294.0,
+      "pd_hits": 274.0,
+      "fa_pixels": 100.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "SIRST-V2",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/result/SIRST-V2_DNANet_14_10_2026_23_22_42_wDS/mIoU__DNANet_SIRST-V2_epoch.pth.tar",
+    "Pd": 0.8866666666666667,
+    "Fa": 6.377696990966797e-06,
+    "IoU": 0.7112426035502959,
+    "n_images": 256,
+    "seconds": 8.105268955230713,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 150.0,
+      "pd_hits": 133.0,
+      "fa_pixels": 107.0
+    }
+  },
+  {
+    "backbone": "dna",
+    "dataset": "SIRST-V2",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/compress_runs/SIRST-V2_pipeline_20261029_200429/student_best.pth.tar",
+    "Pd": 0.94,
+    "Fa": 9.179115295410156e-06,
+    "IoU": 0.7463917525773196,
+    "n_images": 256,
+    "seconds": 7.9531495571136475,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 150.0,
+      "pd_hits": 141.0,
+      "fa_pixels": 154.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "NUAA-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/saved_models/uiunet_irstd/NUAA-SIRST_20261030_151749/uiunet_best.pth.tar",
+    "Pd": 1.0,
+    "Fa": 1.7033066860465116e-06,
+    "IoU": 0.7759010969876371,
+    "n_images": 86,
+    "seconds": 3.976066827774048,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 109.0,
+      "fa_pixels": 15.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "NUAA-SIRST",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/compress_runs/NUAA-SIRST_pipeline_20261104_143259/student_best.pth.tar",
+    "Pd": 1.0,
+    "Fa": 2.6117369186046513e-06,
+    "IoU": 0.7892541298181212,
+    "n_images": 86,
+    "seconds": 2.850465774536133,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 109.0,
+      "fa_pixels": 23.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "NUDT-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/saved_models/uiunet_irstd/NUDT-SIRST_20261030_164112/uiunet_best.pth.tar",
+    "Pd": 0.9862433862433863,
+    "Fa": 5.029885165662651e-06,
+    "IoU": 0.8679728328713793,
+    "n_images": 664,
+    "seconds": 17.700242042541504,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 945.0,
+      "pd_hits": 932.0,
+      "fa_pixels": 342.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "NUDT-SIRST",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/compress_runs/NUDT-SIRST_pipeline_20261104_151521/student_best.pth.tar",
+    "Pd": 0.9809523809523809,
+    "Fa": 6.794757153614458e-06,
+    "IoU": 0.8586209098844017,
+    "n_images": 664,
+    "seconds": 19.450608730316162,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 945.0,
+      "pd_hits": 927.0,
+      "fa_pixels": 462.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "IRSTD-1k",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/saved_models/uiunet_irstd/IRSTD-1k_20261030_193208/uiunet_best.pth.tar",
+    "Pd": 0.9044368600682594,
+    "Fa": 6.801927860696518e-06,
+    "IoU": 0.6551511412708205,
+    "n_images": 201,
+    "seconds": 10.375288486480713,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 293.0,
+      "pd_hits": 265.0,
+      "fa_pixels": 140.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "IRSTD-1k",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/compress_runs/IRSTD-1k_pipeline_20261104_171113/student_best.pth.tar",
+    "Pd": 0.9488054607508533,
+    "Fa": 1.792793843283582e-05,
+    "IoU": 0.6490825688073395,
+    "n_images": 201,
+    "seconds": 9.768926620483398,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 293.0,
+      "pd_hits": 278.0,
+      "fa_pixels": 369.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "SIRST-V2",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/saved_models/uiunet_irstd/SIRST-V2_20261030_224844/uiunet_best.pth.tar",
+    "Pd": 0.9333333333333333,
+    "Fa": 3.5858154296875e-06,
+    "IoU": 0.7297897348831135,
+    "n_images": 256,
+    "seconds": 11.118836641311646,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 150.0,
+      "pd_hits": 140.0,
+      "fa_pixels": 94.0
+    }
+  },
+  {
+    "backbone": "uiu",
+    "dataset": "SIRST-V2",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/IEEE_TIP_UIU-Net-main/compress_runs/SIRST-V2_pipeline_20261104_185830/student_best.pth.tar",
+    "Pd": 0.9333333333333333,
+    "Fa": 3.08990478515625e-06,
+    "IoU": 0.760010572221488,
+    "n_images": 256,
+    "seconds": 10.174787998199463,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 150.0,
+      "pd_hits": 140.0,
+      "fa_pixels": 81.0
+    }
+  },
+  {
+    "backbone": "msh",
+    "dataset": "NUAA-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/MSHNet-main/weight/MSHNet-NUAA-SIRST-2026-11-01-21-56-52/weight.pkl",
+    "Pd": 1.0,
+    "Fa": 6.440628406613373e-05,
+    "IoU": 0.6908583391486393,
+    "n_images": 86,
+    "seconds": 1.4608604907989502,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 109.0,
+      "fa_pixels": 363.0
+    }
+  },
+  {
+    "backbone": "msh",
+    "dataset": "NUAA-SIRST",
+    "role": "student",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/MSHNet-main/compress_runs/NUAA-SIRST_pipeline_20261105_120118/student_best.pth.tar",
+    "Pd": 0.981651376146789,
+    "Fa": 4.666350608648256e-05,
+    "IoU": 0.6959262851600388,
+    "n_images": 86,
+    "seconds": 1.407034158706665,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 107.0,
+      "fa_pixels": 263.0
+    }
+  },
+  {
+    "backbone": "msh",
+    "dataset": "NUDT-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/MSHNet-main/weight/MSHNet-NUDT-SIRST-2026-11-01-23-17-37/weight.pkl",
+    "Pd": 0.9407407407407408,
+    "Fa": 2.348566629800452e-05,
+    "IoU": 0.7558161061400802,
+    "n_images": 664,
+    "seconds": 8.5909903049469,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 945.0,
+      "pd_hits": 889.0,
+      "fa_pixels": 1022.0
+    }
+  }
+]

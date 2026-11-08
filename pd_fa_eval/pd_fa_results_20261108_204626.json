@@ -1,0 +1,21 @@
+[
+  {
+    "backbone": "dna",
+    "dataset": "NUAA-SIRST",
+    "role": "teacher",
+    "ckpt": "/root/autodl-tmp/Infrared-detection-model/Infrared-Small-Target-Detection-master/result/NUAA-SIRST_DNANet_14_10_2026_11_07_43_wDS/mIoU__DNANet_NUAA-SIRST_epoch.pth.tar",
+    "Pd": 0.963302752293578,
+    "Fa": 3.903411155523256e-06,
+    "IoU": 0.71712652249565,
+    "n_images": 86,
+    "seconds": 2.9980008602142334,
+    "threshold": 0.5,
+    "match_dist": 3.0,
+    "note": "prob@thr + centroid<match_dist; Fa=unmatched_pred_pixels/all_pixels",
+    "extra": {
+      "targets": 109.0,
+      "pd_hits": 105.0,
+      "fa_pixels": 22.0
+    }
+  }
+]
