@@ -1,0 +1,3 @@
+model,params_M,flops_G,input,note
+DNANet_student,1.13,12.92,1x3x256x256,from tab:resource (ONNX≈2xMACs)
+L2SKNet_UNet,0.8989,6.8945,1x1x256x256,thop

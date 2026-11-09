@@ -1,0 +1,53 @@
+{
+  "created": "20261109_184717",
+  "rows": [
+    {
+      "model": "L2SKNet_UNet",
+      "dataset": "NUAA-SIRST",
+      "ckpt": "/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/NUAA-SIRST/L2SKNet_UNet/best_miou.pth.tar",
+      "thr": 0.5,
+      "IoU": 0.5859218436873748,
+      "nIoU": 0.5886577388111639,
+      "Pd": 0.9541284403669725,
+      "Fa": 2.6451441808363912e-05,
+      "Fa_1e6": 26.451441808363914,
+      "n_images": 86.0
+    },
+    {
+      "model": "L2SKNet_UNet",
+      "dataset": "NUDT-SIRST",
+      "ckpt": "/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/NUDT-SIRST/L2SKNet_UNet/best_miou.pth.tar",
+      "thr": 0.5,
+      "IoU": 0.9354805266613678,
+      "nIoU": 0.9355206122147447,
+      "Pd": 0.9724867724867725,
+      "Fa": 4.802841738045933e-06,
+      "Fa_1e6": 4.802841738045934,
+      "n_images": 664.0
+    },
+    {
+      "model": "L2SKNet_UNet",
+      "dataset": "IRSTD-1K",
+      "ckpt": "/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/IRSTD-1K/L2SKNet_UNet/best_miou.pth.tar",
+      "thr": 0.5,
+      "IoU": 0.6765201685731487,
+      "nIoU": 0.6650306970244891,
+      "Pd": 0.8855218855218855,
+      "Fa": 1.4708409855021767e-05,
+      "Fa_1e6": 14.708409855021767,
+      "n_images": 201.0
+    },
+    {
+      "model": "L2SKNet_UNet",
+      "dataset": "SIRST-V2",
+      "ckpt": "/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/SIRST-V2/L2SKNet_UNet/best_miou.pth.tar",
+      "thr": 0.5,
+      "IoU": 0.5206885660138977,
+      "nIoU": 0.7069428369053326,
+      "Pd": 0.88,
+      "Fa": 5.660590965696819e-06,
+      "Fa_1e6": 5.660590965696819,
+      "n_images": 256.0
+    }
+  ]
+}

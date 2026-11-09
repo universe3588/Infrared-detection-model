@@ -1,0 +1,5 @@
+model,dataset,ckpt,thr,IoU,nIoU,Pd,Fa,Fa_1e6,n_images
+L2SKNet_UNet,NUAA-SIRST,/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/NUAA-SIRST/L2SKNet_UNet/best_miou.pth.tar,0.5,0.5859218436873748,0.5886577388111639,0.9541284403669725,2.6451441808363912e-05,26.451441808363914,86.0
+L2SKNet_UNet,NUDT-SIRST,/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/NUDT-SIRST/L2SKNet_UNet/best_miou.pth.tar,0.5,0.9354805266613678,0.9355206122147447,0.9724867724867725,4.802841738045933e-06,4.802841738045934,664.0
+L2SKNet_UNet,IRSTD-1K,/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/IRSTD-1K/L2SKNet_UNet/best_miou.pth.tar,0.5,0.6765201685731487,0.6650306970244891,0.8855218855218855,1.4708409855021767e-05,14.708409855021767,201.0
+L2SKNet_UNet,SIRST-V2,/root/autodl-tmp/Infrared-detection-model/Lightweight model comparison/L2SKNet/log/SIRST-V2/L2SKNet_UNet/best_miou.pth.tar,0.5,0.5206885660138977,0.7069428369053326,0.88,5.660590965696819e-06,5.660590965696819,256.0
