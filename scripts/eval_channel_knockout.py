@@ -199,9 +199,76 @@ def main():
     ratios = [float(x) for x in args.ratios.split(",") if x.strip() != ""]
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
 
-    dnanet_root = os.path.abspath(args.dnanet_root)
+    launch_cwd = os.getcwd()
+    dnanet_root = args.dnanet_root
+    if not os.path.isabs(dnanet_root):
+        dnanet_root = os.path.abspath(os.path.join(launch_cwd, dnanet_root))
+    else:
+        dnanet_root = os.path.abspath(dnanet_root)
     if not os.path.isdir(dnanet_root):
         raise SystemExit(f"DNANet root not found: {dnanet_root}")
+    workspace = os.path.dirname(dnanet_root)
+
+    def resolve_path(p: str) -> str:
+        """Resolve paths before/after chdir; accept DNANet/... or result/... forms."""
+        if not p:
+            return p
+        p_norm = p.replace("\\", "/")
+        strip_names = []
+        if p_norm.startswith("DNANet/") or p_norm.startswith("DNANet\\"):
+            strip_names.append(p_norm.split("/", 1)[-1] if "/" in p_norm else p_norm.split("\\", 1)[-1])
+        cands = [
+            p,
+            os.path.join(launch_cwd, p),
+            os.path.join(workspace, p),
+            os.path.join(dnanet_root, p),
+            os.path.abspath(p),
+        ]
+        for s in strip_names:
+            cands.extend([
+                os.path.join(dnanet_root, s),
+                os.path.join(launch_cwd, "DNANet", s),
+            ])
+        # common: user passes DNANet/result/... while cwd will be DNANet
+        if "result/" in p_norm or p_norm.startswith("result"):
+            tail = p_norm.split("result/", 1)[-1] if "result/" in p_norm else p_norm
+            cands.append(os.path.join(dnanet_root, "result", tail if not tail.startswith("result") else tail[7:]))
+        seen = set()
+        for c in cands:
+            c_abs = os.path.abspath(c)
+            if c_abs in seen:
+                continue
+            seen.add(c_abs)
+            if os.path.exists(c_abs):
+                return c_abs
+        return os.path.abspath(os.path.join(launch_cwd, p))
+
+    # Resolve all user paths BEFORE chdir into DNANet
+    ckpt_path = resolve_path(args.teacher_ckpt)
+    scores_path = resolve_path(args.scores_path) if args.scores_path else ""
+    data_root = resolve_path(args.data_root)
+    out_path = args.out
+    if not os.path.isabs(out_path):
+        out_path = os.path.abspath(os.path.join(launch_cwd, out_path))
+
+    if not os.path.isfile(ckpt_path):
+        # helpful listing
+        result_dir = os.path.join(dnanet_root, "result")
+        hint = ""
+        if os.path.isdir(result_dir):
+            nuaa = sorted([d for d in os.listdir(result_dir) if d.startswith("NUAA")])
+            hint = f"\n[hint] DNANet/result 下 NUAA 目录: {nuaa[:8]}"
+        raise SystemExit(
+            f"teacher ckpt not found.\n"
+            f"  given: {args.teacher_ckpt}\n"
+            f"  resolved: {ckpt_path}\n"
+            f"  dnanet_root: {dnanet_root}\n"
+            f"  launch_cwd: {launch_cwd}"
+            f"{hint}\n"
+            f"可改用相对 DNANet 的路径，例如:\n"
+            f"  --teacher-ckpt result/NUAA-SIRST_DNANet_14_10_2026_11_07_43_wDS/mIoU__DNANet_NUAA-SIRST_epoch.pth.tar"
+        )
+
     sys.path.insert(0, dnanet_root)
     os.chdir(dnanet_root)
 
@@ -214,6 +281,11 @@ def main():
     from compress.importance import ImportanceEstimator, l1_weight_scores
 
     print(f"[env] device={device}  cuda={torch.cuda.is_available()}")
+    print(f"[path] dnanet_root={dnanet_root}")
+    print(f"[path] teacher={ckpt_path}")
+    print(f"[path] data_root={data_root}")
+    if scores_path:
+        print(f"[path] scores={scores_path}")
     if device.type == "cpu":
         print("[hint] 全量 11 比例 × 4 方法在 CPU 上通常要数小时；建议 --device cuda，"
               "或先用 --ratios 0,0.1,0.2,0.3 --limit 16 冒烟。")
@@ -227,23 +299,6 @@ def main():
         nb_filter=list(nb_filter),
         deep_supervision=True,
     )
-    def resolve_path(p: str) -> str:
-        if os.path.isabs(p) and os.path.exists(p):
-            return p
-        cands = [
-            p,
-            os.path.join(os.path.dirname(dnanet_root), p),
-            os.path.join(dnanet_root, p),
-            os.path.abspath(p),
-        ]
-        for c in cands:
-            if os.path.exists(c):
-                return os.path.abspath(c)
-        return p
-
-    ckpt_path = resolve_path(args.teacher_ckpt)
-    if not os.path.isfile(ckpt_path):
-        raise SystemExit(f"teacher ckpt not found: {args.teacher_ckpt}")
     state = load_state_dict_flexible(ckpt_path)
     state = {k.replace("module.", ""): v for k, v in state.items()}
     missing, unexpected = model.load_state_dict(state, strict=False)
@@ -257,8 +312,6 @@ def main():
     adapter = DNANetAdapter(list(nb_filter))
     print(f"[teacher] nb_filter={list(nb_filter)}  ckpt={ckpt_path}")
 
-    # data root
-    data_root = resolve_path(args.data_root)
     if not os.path.isdir(os.path.join(data_root, args.dataset)):
         raise SystemExit(f"dataset not found under {data_root}/{args.dataset}")
     _, test_ids, _ = load_dataset(data_root, args.dataset, args.split_method, subset_size=0, subset_seed=42)
@@ -286,12 +339,11 @@ def main():
 
     # scores for I
     scores_I: Optional[Dict[str, torch.Tensor]] = None
-    if args.scores_path:
-        sp = resolve_path(args.scores_path)
-        if not os.path.isfile(sp):
-            raise SystemExit(f"scores.pt not found: {args.scores_path}")
-        scores_I = load_scores(sp)
-        print(f"[scores] loaded I from {sp}")
+    if scores_path:
+        if not os.path.isfile(scores_path):
+            raise SystemExit(f"scores.pt not found: {args.scores_path} -> {scores_path}")
+        scores_I = load_scores(scores_path)
+        print(f"[scores] loaded I from {scores_path}")
     else:
         print("[scores] no --scores-path; recomputing full I on train loader ...")
         from model.utils import TrainSetLoader
@@ -347,12 +399,7 @@ def main():
                 f"drop_ch={n_drop:<4d}  IoU={iou:.4f}  ({time.time()-t1:.1f}s)"
             )
 
-    # write CSV
-    out_path = args.out
-    if not os.path.isabs(out_path):
-        # prefer writing relative to workspace parent of DNANet
-        cand = os.path.join(os.path.dirname(dnanet_root), out_path)
-        out_path = cand
+    # write CSV（out_path 已在 chdir 前解析为绝对路径）
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 
     # column order fixed for MATLAB
