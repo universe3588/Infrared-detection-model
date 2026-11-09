@@ -73,11 +73,11 @@
 ## 5. 仍缺（不挡关机；投稿增强）
 
 - P1：Pareto / 定性图；准则 Pd/Fa（可选）
-- P2：外部基线 H1
-  - IRPruneDet / LW / RepISD：本机已测四集（`results/ex04_baselines/`）
-  - SAGCP：**仅摘要相对量**（`sagcp_paper_cite.md`）；无 PDF 绝对表
-  - L2SK：已训完；统一口径复测 → `scripts/eval_l2sk_unified.py`（AutoDL）
-  - 板端：L2SK/RepISD 同协议 → `deploy_rk3588/ADB_DEPLOY_EX04.md`
+- P2：外部基线 H1（**已写入正文** `tab:h1_hard`，口径=难集分集训）
+  - 主对照：DNA 教师/学生 vs L2SK（NUAA/SIRST-V2 掉点；NUDT 可打平）
+  - IRPruneDet / LW / RepISD：单集权重，正文作参照不硬比
+  - SAGCP：摘要相对量；无公开权重
+  - 板端：不纳入从零轻量竞速；师生资源表已齐
 - P2 其它：INT8、功耗计、失败案例（可选）
 
 ## 6. 口径备忘

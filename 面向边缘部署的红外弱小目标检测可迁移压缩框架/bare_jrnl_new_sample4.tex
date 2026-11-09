@@ -80,7 +80,7 @@
 传统方法包括滤波、局部对比与低秩稀疏分解等\cite{IPI2013}，可解释性强但对复杂场景鲁棒性有限。深度学习将任务建模为像素级分割：ACM/ALCNet\cite{ACM2021,ALCNet2021}引入上下文与局部对比；DNA-Net\cite{DNANet2023}以密集嵌套交互维持深层小目标响应；UIU-Net\cite{UIUNet2023}采用 U-Net in U-Net；ISNet\cite{ISNet2022}强调形状；SCTransNet\cite{SCTransNet2024}引入空间嵌入的通道式 Transformer。上述高精度模型构成本文压缩的教师起点与泛化验证对象。
 
 \subsection{轻量网络与嵌入式部署}
-RDIAN\cite{RDIAN2023}、RepISD-Net\cite{RepISDNet2023}、L$^2$SKNet\cite{L2SKNet2025}、LW-IRSTNet\cite{LWIRSTNet2023}等从结构设计阶段控制复杂度，后者还报告了开发板推理速度。该类工作是“同延迟预算下对照从零轻量模型”的重要基线，但与“从高容量模型压缩并继承能力”的命题不同。
+RDIAN\cite{RDIAN2023}、RepISD-Net\cite{RepISDNet2023}、L$^2$SKNet\cite{L2SKNet2025}、LW-IRSTNet\cite{LWIRSTNet2023}等从结构设计阶段控制复杂度，后者还报告了开发板推理速度。该类工作是相近 Params 下的从零轻量精度基线，但与“从高容量模型压缩并继承难集能力、再以师生板端闭环验证部署收益”的命题不同。
 
 \subsection{模型压缩与 IRSTD 专用剪枝}
 通用剪枝如 Network Slimming\cite{NetworkSlimming2017}、Soft Filter Pruning\cite{SoftFilterPruning2018}等面向分类，易误伤 IRSTD 所需的浅层空间细节。IRPruneDet\cite{IRPruneDet2024}、SAGCP\cite{SAGCP2025} 证明了任务专用剪枝的必要性。知识蒸馏\cite{HintonDistill2015}为剪后恢复提供了通用工具。本文与之差异在于：面向小目标的区域敏感评分、跨架构共掩码协议、蒸馏恢复与\textbf{板端效率闭环}一体。
@@ -226,7 +226,9 @@ PyTorch 训练；敏感性评分默认 $50$ batch，$\alpha=0.7$，膨胀核半�
 
 \subsubsection{对比与定位}
 本文主对比为\textbf{同骨干教师 vs 学生}（验证压缩有效且可迁移），并报告跨 DNA-Net/UIU-Net/MSHNet/SCTransNet 的板端资源表。
-\ExpTodo{Ex04}{补充与 IRPruneDet/SAGCP/从零轻量网络在相近 Params 或板端延迟下的对照（H1）。}
+效率闭环仅在师生之间展开：回答的是“压缩后相对高精度教师更省多少板端资源”，而非与从零轻量网络竞速。
+外部对照（H1）回答“为何不直接采用从零轻量模型”：在相近 Params 量级下，于\textbf{难集}（以真实空基/复杂场景为主的 NUAA-SIRST、SIRST-V2）比较从零轻量网络与 DNA-Net 教师/学生；易集 NUDT-SIRST 与 IRSTD-1k 一并报告以作对照。
+剪枝族对照中，IRPruneDet\cite{IRPruneDet2024} 作相关工作参照；SAGCP\cite{SAGCP2025} 因无公开权重，仅引用其摘要相对压缩量，不作逐格 IoU 硬比。具体结果见表~\ref{tab:h1_hard}。
 
 \subsection{主结果：精度}
 \label{sec:main_results}
@@ -329,6 +331,35 @@ SCTransNet & $11.33\!\rightarrow\!5.72$ & $20.24\!\rightarrow\!13.32$ & $36.4\!\
 
 \noindent\textit{注：}SCTransNet 板端输入为单通道灰度；其余骨干为三通道。可选后续补充 INT8 与功耗计数据。
 
+\subsection{外部对照：难集上的从零轻量 vs 压缩学生}
+\label{sec:h1_hard}
+
+为检验“相近容量下从零轻量是否足以替代压缩高精度模型”，表~\ref{tab:h1_hard}在统一评测口径（阈值 $0.5$，质心距离 $<3$）下报告 DNA-Net 教师/学生与 Params 同量级的从零轻量网络 L$^2$SKNet-UNet\cite{L2SKNet2025}（约 $0.90$\,M vs 本文 DNA 学生 $1.13$\,M）。三者均按各数据集分别训练后测试，因而此处衡量的是\textbf{难集上的容量与可学性}，而非跨数据集零样本迁移。
+
+\begin{table}[!t]
+\caption{难集对照（H1）：DNA-Net 教师/学生 vs 从零轻量 L$^2$SKNet（分集训练；IoU）。}
+\label{tab:h1_hard}
+\centering
+\footnotesize
+\begin{tabular}{|l|c|c|c|c|c|c|}
+\hline
+方法 & Params(M) & NUAA & SIRST-V2 & NUDT & IRSTD-1k & 均值 \\
+\hline
+DNA-Net 教师 & 4.69 & 0.7171 & 0.7112 & 0.8488 & 0.6230 & 0.7250 \\
+本文-DNA 学生 & 1.13 & \textbf{0.7387} & \textbf{0.7464} & 0.9226 & 0.6706 & \textbf{0.7696} \\
+\hline
+L$^2$SKNet-UNet & 0.90 & 0.5859 & 0.5207 & \textbf{0.9355} & 0.6765 & 0.6797 \\
+\hline
+\end{tabular}
+\end{table}
+
+结论可归纳为三点。
+（1）\textbf{难集差距显著}：在 NUAA-SIRST / SIRST-V2 上，L$^2$SKNet 相对 DNA 学生分别低约 $15.3$ / $22.6$ 个百分点，相对 DNA 教师亦低约 $13.1$ / $19.1$ 个百分点，说明“生来就轻”并不能自动保住高精度模型在真实难场景上的表现。
+（2）\textbf{易集并不构成反例}：NUDT-SIRST 上 L$^2$SKNet 略高于 DNA 学生（$0.9355$ vs $0.9226$），IRSTD-1k 基本持平；因而主张应表述为“难集上从零轻量更易掉点”，而非“一切数据集全面崩塌”。
+（3）\textbf{压缩学生同时满足两点}：相对教师，DNA 学生 Params/FLOPs/板端延迟均下降（表~\ref{tab:resource}）；相对同量级从零轻量，难集 IoU 明显更高。换言之，压缩继承了高容量骨干在难集上的可用精度，并把部署开销压到轻量量级附近。
+
+补充说明：公开权重的 LW-IRSTNet\cite{LWIRSTNet2023}、RepISD-Net\cite{RepISDNet2023} 与 IRPruneDet\cite{IRPruneDet2024} 多为单集（NUAA）发布权重；在相同统一脚本下其 NUAA IoU 分别为 $0.6859$、$0.7786$、$0.7464$，可作为从零轻量/剪枝族参照，但因缺少与本文一致的四集分训权重，不作与表~\ref{tab:h1_hard} 同行硬比。SAGCP\cite{SAGCP2025} 摘要报告在 DNA-Net 上 Params/FLOPs 分别下降 $72.34\%$/$57.49\%$、IoU 相对未剪模型 $+2.02$ 个百分点；本文 DNA 学生压缩比相近（Params $-75.8\%$、FLOPs $-53.6\%$），并额外给出四集实测与 RK3588 闭环，因无公开权重与完整分表而不做逐格对齐。
+
 \subsection{消融与机制验证}
 \label{sec:ablation}
 
@@ -425,9 +456,11 @@ $\ell_1$ 权重 & 0.7595$^{\ast}$ \\
 \label{sec:discuss}
 \textbf{有效性：}跨 DNA-Net/UIU-Net/MSHNet/SCTransNet，压缩在保持 IoU 与目标级 $P_d$ 的同时显著降低 Params/FLOPs（SCTransNet 幅度更温和），并在 RK3588 上获得可测的延迟与内存收益，说明协议可迁移且面向部署可用。
 
+\textbf{难集动机：}表~\ref{tab:h1_hard}表明，Params 同量级的从零轻量网络在 NUAA-SIRST/SIRST-V2 上明显弱于 DNA 学生，而在 NUDT 等易集可打平；因此本文选择“压缩高精度骨干并继承难集能力”，而非仅依赖从零轻量结构。板端资源对照保留在师生之间，避免把贡献叙事滑向轻量模型竞速。
+
 \textbf{FLOPs--延迟鸿沟：}DNA-Net 上 FLOPs 降约一半而延迟仅降约 $12\%$；SCTransNet 上 FLOPs 降约 $34\%$ 而延迟约降 $14\%$。二者均提示 NPU 推理受算子形态、带宽与调度影响；论文应将其作为边缘 AI 的必要讨论，而非只报告 FLOPs。
 
-\textbf{局限：}（1）当前 SCTransNet 仅压缩 CNN 宽度，未削减 Transformer 层数，故压缩比低于纯 CNN 骨干；（2）逐步敲除曲线目前为示意（图~\ref{fig:knockout}），外部剪枝基线仍待补全；（3）单位帧能耗需功率计；（4）极低 SCR 场景下的失败案例需定性展示。
+\textbf{局限：}（1）当前 SCTransNet 仅压缩 CNN 宽度，未削减 Transformer 层数，故压缩比低于纯 CNN 骨干；（2）逐步敲除曲线目前为示意（图~\ref{fig:knockout}）；（3）外部对照以 Params 同量级难集精度为主，未将从零轻量网络纳入板端竞速；（4）单位帧能耗需功率计；（5）极低 SCR 场景下的失败案例需定性展示。
 \ExpTodo{Ex16}{补充失败案例可视化与量化敏感讨论。}
 
 %==============================================================================
@@ -435,7 +468,7 @@ $\ell_1$ 权重 & 0.7595$^{\ast}$ \\
 \label{sec:concl}
 本文面向嵌入式红外弱小目标检测，提出与骨干解耦的可迁移压缩框架：以小目标敏感性评分为核心识别冗余通道，在共掩码约束下结构化变窄，经区域损失与输出蒸馏恢复后，在 RK3588 上验证真实效率。实验表明，DNA-Net/UIU-Net/MSHNet 学生相对教师可实现约 $72\%$--$78\%$ 的参数压缩与约 $54\%$--$62\%$ 的 FLOPs 下降；SCTransNet 在保留 Transformer 的设定下仍取得约 $49.5\%$/$34.2\%$ 的 Params/FLOPs 下降。四骨干上 IoU 与统一脚本 $P_d$/$F_a$ 总体保持；板端延迟下降约 $12\%$--$39\%$，并揭示算力指标与墙钟加速的不等价性。
 
-未来工作包括：准则/蒸馏消融与外部同预算对照、Transformer 层侧压缩、量化感知压缩、视频序列扩展，以及更广泛芯片平台验证。
+未来工作包括：更多同量级新近从零轻量网络的难集复现、Transformer 层侧压缩、量化感知压缩、视频序列扩展，以及更广泛芯片平台验证。
 
 %==============================================================================
 \section*{Acknowledgments}
@@ -458,9 +491,9 @@ P1 & \textcolor{blue}{已完成 IoU} & 表~\ref{tab:criterion}/\ref{tab:distill}
 \hline
 P1 & \textcolor{blue}{Pareto 已完成} & Fig.~\ref{fig:pareto}；Fig.~\ref{fig:qual} 仍待 \\
 \hline
-P2 & 增强 & 敲除曲线；与 IRPruneDet/SAGCP/轻量网络同预算对照 \\
+P2 & \textcolor{blue}{难集 H1 已完成} & 表~\ref{tab:h1_hard}（L$^2$SKNet）；IRPruneDet/SAGCP 为引用/单集参照 \\
 \hline
-P2 & 增强 & INT8 掉点、功耗计 \\
+P2 & 增强 & 敲除曲线；INT8 掉点、功耗计 \\
 \hline
 \end{tabular}
 \end{center}
