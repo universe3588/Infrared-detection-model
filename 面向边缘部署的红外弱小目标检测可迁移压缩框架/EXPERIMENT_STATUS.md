@@ -73,7 +73,11 @@
 ## 5. 仍缺（不挡关机；投稿增强）
 
 - P1：Pareto / 定性图；准则 Pd/Fa（可选）
-- P2：敲除曲线、外部基线 H1、INT8、功耗计、失败案例
+- P2：外部基线 H1
+  - IRPruneDet / LW / RepISD：本机已测四集（`results/ex04_baselines/`）
+  - SAGCP：**引用论文数值**（`results/ex04_baselines/sagcp_paper_cite.md`）；绝对表待 PDF 手填
+  - L2SK：**AutoDL 从零训练**（`Lightweight model comparison/L2SKNet/AUTODL.md`）
+- P2 其它：INT8、功耗计、失败案例（可选）
 
 ## 6. 口径备忘
 

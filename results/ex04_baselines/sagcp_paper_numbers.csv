@@ -1,0 +1,4 @@
+method,backbone,metric,value,unit,source,note
+SAGCP,DNA-Net,Params_reduction,72.34,percent,TGRS2025 abstract,relative to unpruned DNA-Net
+SAGCP,DNA-Net,FLOPs_reduction,57.49,percent,TGRS2025 abstract,relative to unpruned DNA-Net
+SAGCP,DNA-Net,IoU_delta,+2.02,pp,TGRS2025 abstract,absolute IoU table TBD from PDF

@@ -1,0 +1,47 @@
+{
+  "created": "20261108_221932",
+  "rows": [
+    {
+      "model": "IRPruneDet",
+      "dataset": "NUAA-SIRST",
+      "n_images": 2,
+      "IoU": 0.7765042979942693,
+      "nIoU": 0.783050739418664,
+      "Pd": 1.0,
+      "Fa": 0.0,
+      "Fa_1e6": 0.0,
+      "seconds": 1.7791695594787598,
+      "base_size": 512,
+      "ckpt": "D:\\Desktop\\红外检测模型\\Lightweight model comparison\\IRPruneDet\\checkpoints\\hard_finetuned\\irprunedet_model.pkl",
+      "note": "NUAA-trained; non-NUAA = zero-shot"
+    },
+    {
+      "model": "LW",
+      "dataset": "NUAA-SIRST",
+      "n_images": 2,
+      "IoU": 0.7906976744186046,
+      "nIoU": 0.845100105374078,
+      "Pd": 1.0,
+      "Fa": 0.0,
+      "Fa_1e6": 0.0,
+      "seconds": 0.0711205005645752,
+      "base_size": 256,
+      "ckpt": "D:\\Desktop\\红外检测模型\\Lightweight model comparison\\LW-IRSTNet\\LW_IRST.pkl",
+      "note": "NUAA-trained; non-NUAA = zero-shot"
+    },
+    {
+      "model": "RepISD",
+      "dataset": "NUAA-SIRST",
+      "n_images": 2,
+      "IoU": 0.8765432098765432,
+      "nIoU": 0.8518518518518519,
+      "Pd": 1.0,
+      "Fa": 0.0,
+      "Fa_1e6": 0.0,
+      "seconds": 0.5432252883911133,
+      "base_size": 256,
+      "ckpt": "D:\\Desktop\\红外检测模型\\Lightweight model comparison\\RepISD-Net\\result\\NUAA\\deploy.pth.tar",
+      "note": "NUAA-trained; non-NUAA = zero-shot"
+    }
+  ]
+}

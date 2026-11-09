@@ -1,0 +1,4 @@
+model,dataset,n_images,IoU,nIoU,Pd,Fa,Fa_1e6,seconds,base_size,ckpt,note
+IRPruneDet,NUAA-SIRST,2,0.7765042979942693,0.783050739418664,1.0,0.0,0.0,1.7791695594787598,512,D:\Desktop\红外检测模型\Lightweight model comparison\IRPruneDet\checkpoints\hard_finetuned\irprunedet_model.pkl,NUAA-trained; non-NUAA = zero-shot
+LW,NUAA-SIRST,2,0.7906976744186046,0.845100105374078,1.0,0.0,0.0,0.0711205005645752,256,D:\Desktop\红外检测模型\Lightweight model comparison\LW-IRSTNet\LW_IRST.pkl,NUAA-trained; non-NUAA = zero-shot
+RepISD,NUAA-SIRST,2,0.8765432098765432,0.8518518518518519,1.0,0.0,0.0,0.5432252883911133,256,D:\Desktop\红外检测模型\Lightweight model comparison\RepISD-Net\result\NUAA\deploy.pth.tar,NUAA-trained; non-NUAA = zero-shot
