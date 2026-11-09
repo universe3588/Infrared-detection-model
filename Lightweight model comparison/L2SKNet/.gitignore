@@ -1,0 +1,7 @@
+log/
+result/
+__pycache__/
+*.pyc
+data/*/images
+data/*/masks
+.DS_Store
