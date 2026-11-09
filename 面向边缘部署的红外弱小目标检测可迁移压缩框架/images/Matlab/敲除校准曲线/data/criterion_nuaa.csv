@@ -1,8 +1,0 @@
-method,iou,note
-Random,0.7247,GroupB same prune rate + full distill
-L1,0.7595,repaired after first collapse
-I_task,0.7374,task only
-I_contrast,0.7408,contrast only
-I_full_ablation,0.7188,ablation campaign A0/B full
-I_full_main,0.7387,main-table DNA student NUAA
-Teacher,0.7171,fair re-eval reference

@@ -1,7 +1,0 @@
-setting,nuaa_iou,nudt_iou
-A1_no_retrain,0.0081,0.2183
-A2_seg_only,0.7454,0.9149
-A3_seg_region,0.7551,0.9180
-A4_full_ablation,0.7188,0.9184
-A4_full_main,0.7387,0.9226
-Teacher,0.7171,0.8487

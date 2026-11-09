@@ -1,9 +1,0 @@
-backbone,role,iou_mean,params_M,flops_G,iou_nuaa
-DNA-Net,teacher,0.7250,4.69,27.85,0.7171
-DNA-Net,student,0.7696,1.13,12.92,0.7387
-UIU-Net,teacher,0.7804,50.54,109.0,0.7686
-UIU-Net,student,0.7819,13.89,46.8,0.7741
-MSHNet,teacher,0.7142,4.07,12.22,0.6909
-MSHNet,student,0.7140,0.89,4.70,0.6959
-SCTransNet,teacher,0.7907,11.33,20.24,0.7765
-SCTransNet,student,0.7858,5.72,13.32,0.7849

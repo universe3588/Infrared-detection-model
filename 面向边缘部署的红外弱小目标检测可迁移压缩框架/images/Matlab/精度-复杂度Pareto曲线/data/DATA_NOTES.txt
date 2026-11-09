@@ -1,9 +1,0 @@
-精度--复杂度 Pareto 数据说明
-================================
-来源：
-  - iou_mean / iou_nuaa：论文主表 tab:main_iou
-  - params_M / flops_G：论文资源表 tab:resource（NUAA @256，thop）
-
-绘图：教师点 → 学生点连线（压缩轨迹）
-  左图 IoU_mean vs Params
-  右图 IoU_mean vs FLOPs
