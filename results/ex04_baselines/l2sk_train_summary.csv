@@ -1,0 +1,5 @@
+model,dataset,best_mIoU,best_mIoU_epoch,best_Pd,best_Fa_1e6,epochs,ckpt
+L2SKNet_UNet,NUAA-SIRST,0.563216,127,0.954128,13.14,400,log/NUAA-SIRST/L2SKNet_UNet/best_miou.pth.tar
+L2SKNet_UNet,NUDT-SIRST,0.935481,358,0.978836,2.55,400,log/NUDT-SIRST/L2SKNet_UNet/best_miou.pth.tar
+L2SKNet_UNet,IRSTD-1K,0.676419,187,0.942761,4.97,400,log/IRSTD-1K/L2SKNet_UNet/best_miou.pth.tar
+L2SKNet_UNet,SIRST-V2,0.520689,112,0.933333,5.75,400,log/SIRST-V2/L2SKNet_UNet/best_miou.pth.tar

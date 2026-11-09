@@ -75,8 +75,9 @@
 - P1：Pareto / 定性图；准则 Pd/Fa（可选）
 - P2：外部基线 H1
   - IRPruneDet / LW / RepISD：本机已测四集（`results/ex04_baselines/`）
-  - SAGCP：**引用论文数值**（`results/ex04_baselines/sagcp_paper_cite.md`）；绝对表待 PDF 手填
-  - L2SK：**AutoDL 从零训练**（`Lightweight model comparison/L2SKNet/AUTODL.md`）
+  - SAGCP：**仅摘要相对量**（`sagcp_paper_cite.md`）；无 PDF 绝对表
+  - L2SK：已训完；统一口径复测 → `scripts/eval_l2sk_unified.py`（AutoDL）
+  - 板端：L2SK/RepISD 同协议 → `deploy_rk3588/ADB_DEPLOY_EX04.md`
 - P2 其它：INT8、功耗计、失败案例（可选）
 
 ## 6. 口径备忘
