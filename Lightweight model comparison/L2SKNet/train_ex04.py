@@ -131,6 +131,11 @@ def train_one():
     os.makedirs(ckpt_dir, exist_ok=True)
 
     for idx_epoch in range(epoch_state, opt.nEpochs):
+        print(
+            "[progress] %s | %s | epoch %d/%d | best_mIoU=%.4f"
+            % (opt.dataset_name, opt.model_name, idx_epoch + 1, opt.nEpochs, opt.best_miou),
+            flush=True,
+        )
         net.train()
         total_loss_epoch = []
         for img, gt_mask in train_loader:
@@ -167,6 +172,18 @@ def train_one():
         test_and_maybe_save_best(net, device, ckpt_dir, idx_epoch, total_loss_list)
 
 
+def _pad_to_multiple(x: torch.Tensor, multiple: int = 32):
+    """UNet skip 连接要求 H/W 能被 32 整除；NUAA 等原图尺寸不齐时先 pad 再裁回。"""
+    import torch.nn.functional as F
+
+    _, _, h, w = x.shape
+    ph = (multiple - h % multiple) % multiple
+    pw = (multiple - w % multiple) % multiple
+    if ph or pw:
+        x = F.pad(x, (0, pw, 0, ph), mode="constant", value=0)
+    return x
+
+
 def test_and_maybe_save_best(net, device, ckpt_dir, idx_epoch, total_loss_list):
     test_set = build_dataset(opt.dataset_name, base_dir=_dataset_base(opt.dataset_name), mode="test")
     test_loader = DataLoader(dataset=test_set, num_workers=1, batch_size=1, shuffle=False)
@@ -179,14 +196,20 @@ def test_and_maybe_save_best(net, device, ckpt_dir, idx_epoch, total_loss_list):
     for img, gt_mask, size, _ in test_loader:
         with torch.no_grad():
             img = Variable(img).to(device)
-            pred = net.forward(img)
-            pred = pred[:, :, : size[0], : size[1]]
-        gt_mask = gt_mask[:, :, : size[0], : size[1]]
+            # size 可能是 list/tuple of tensors（DataLoader 打包）
+            if torch.is_tensor(size[0]):
+                oh, ow = int(size[0].item()), int(size[1].item())
+            else:
+                oh, ow = int(size[0]), int(size[1])
+            img_pad = _pad_to_multiple(img, 32)
+            pred = net.forward(img_pad)
+            pred = pred[:, :, :oh, :ow]
+        gt_mask = gt_mask[:, :, :oh, :ow]
         eval_mIoU.update((pred > opt.threshold).cpu(), gt_mask)
         eval_PD_FA.update(
             pred[0, 0, :, :].cpu().detach().numpy(),
             gt_mask[0, 0, :, :].detach().numpy(),
-            size,
+            [oh, ow],
         )
         eval_mIoU_P_R_F.update(
             labels=gt_mask[0, 0, :, :].detach().numpy(),
