@@ -1,0 +1,1064 @@
+IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING, VOL. 63, 2025 5615011
+Sparsity-Aware Global Channel Pruning for Infrared
+Small-Target Detection Networks
+Shuanglin Wu
+ , Chao Xiao
+ , Yingqian Wang
+ , Member , IEEE, Jungang Yang
+ , and Wei An
+Abstract— For infrared small-target detection, convolutional
+neural network (CNN)-based methods have demonstrated
+promising performance. However, due to the small size of the
+targets, existing infrared small-target detection methods necessi-
+tate intricate structures with intensive computation to maintain
+distinctive features of targets in deep layers, which poses great
+challenges for deployment on edge devices with constrained
+resources. The current pruning methods predominantly focus
+on the optimization of classification networks, with an emphasis
+on semantic information. Nevertheless, the spatial details crucial
+for infrared small-target detection are excessively pruned in
+the shallow layers, resulting in a significant degradation of
+detection performance. In this article, based on the sparse
+distribution of small targets in infrared images, we propose a
+sparsity-aware global channel pruning (SAGCP) framework to
+optimize infrared small-target detection networks. Specifically,
+sparse modeling is used to code the target region for the first time,
+and sparse priors can be induced into the feature map for the
+identification of redundant channels. Without the need for extra
+structures or intricate criteria to identify redundant channels, our
+pruning method can leverage the inherent properties of infrared
+small targets to extract more robust features and obtain more
+compact models. When SAGCP is applied to the existing infrared
+small-target detection methods, the pruned network is superior in
+model efficiency and detection performance. For example, when
+applying our method to DNA-Net, the pruned model can achieve
+a 72.34% reduction in parameters, and a 57.49% decrease in
+floating point operations (FLOPs), but a 2.02% increase in
+intersection over union (IoU).
+Index Terms— Channel pruning, infrared small-target detec-
+tion, sparse reconstruction.
+I. I NTRODUCTION
+S
+INGLE-FRAME
+infrared small-target (SIRST) detection
+aims to precisely locate targets of interests (e.g., drones,
+helicopters, and vehicles) from a single infrared image. It is
+widely used in civil and military applications, including fire
+warning [7], [19], [35], medical imaging [26], [40], [42],
+maritime surveillance [36], [46], [57], and precision guid-
+ance [22], [23], [39]. Traditional infrared small-target detection
+Received 15 October 2024; revised 6 January 2025 and 6 February 2025;
+accepted 20 February 2025. Date of publication 24 February 2025; date
+of current version 20 March 2025. This work was supported in part by
+the Foundation for Innovative Research Groups of the National Natural
+Science Foundation of China under Grant 61921001; and in part by the
+Distinguished Young Scholar Foundation of Hunan Province, China, under
+Grant 2024JJ2063. (Corresponding authors: Wei An; Jungang Yang.)
+The authors are with the College of Electronic Science and Tech-
+nology, National University of Defense Technology, Changsha 410073,
+China (e-mail: wushuanglin20@nudt.edu.cn; yangjungang@nudt.edu.cn;
+anwei@nudt.edu.cn).
+Digital Object Identifier 10.1109/TGRS.2025.3544645
+Fig. 1. Tradeoff between IoU, number of parameters (#Params.), and
+floating point operations (FLOPs). Results are achieved on the NUAA-SIRST
+dataset [5]. FLOPs is tested on an NVIDIA GeForce RTX 3090 GPU with
+an input image at a resolution of 256 × 256.
+methods [15], [33], [59], [60] rely on prior assumptions and
+lack semantic distinction between real targets and background
+clutter interferences. The prior-based methods demonstrate
+sensitivity to hyperparameters related to the image and struggle
+to adapt to scenes where the target size or background changes
+rapidly.
+In recent years, convolutional neural networks (CNNs)
+have demonstrated robust performance in image classifica-
+tion [1], [17] and object detection [48], [56] due to their strong
+modeling capability. In contrast to general object detection,
+infrared small targets typically occupy a limited spatial area
+within the image due to the long imaging distance, leading to
+restricted texture and shape information. Moreover, due to the
+impact of atmospheric refraction/scattering and imaging noise,
+infrared small targets are prone to be submerged in the clutters,
+resulting in low contrast to the background. Consequently, the
+general object detection methods [13], [55] cannot be directly
+applied to infrared small-target detection.
+To extract and maintain the features of small targets in
+deep layers, the existing CNN-based SIRST detection meth-
+ods employ various feature fusion strategies and attention
+mechanisms. For example, Li et al. [27] introduced a dense
+nested interaction module (DNIM) and a hierarchical channel
+and spatial attention module (CSAM) to facilitate progres-
+sive interaction between high- and low-level features through
+iterative processes, thereby enhancing the features of small
+targets. Guo et al. [14] developed a triple cross-layer fusion
+module (TCFM) to exchange high-level semantics and fine-
+grained details, which can preserve the subtle details of
+1558-0644 © 2025 IEEE. All rights reserved, including rights for text and data mining, and training of artificial intelligence
+and similar technologies. Personal use is permitted, but republication/redistribution requires IEEE permission.
+See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+5615011 IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING, VOL. 63, 2025
+infrared small targets in deeper layers. Li et al. [28] proposed
+a moderately dense adaptive feature fusion (MDAF) module
+to enhance the reusability of features from infrared small
+targets by aggregating weighted features from different layers.
+Despite the promising performance of CNN-based methods
+for infrared small-target detection, their computation-intensive
+nature often compromises real-time inference efficiency for
+detection performance. Consequently, there is an urgent need
+to explore a lightweight network architecture for efficient
+infrared small-target detection.
+The existing model compression and acceleration tech-
+niques, including parameter quantization [12], [51], model
+pruning [4], [31], and knowledge distillation [47], [67],
+have demonstrated significant efficiency improvement for
+computation-intensive networks. Among these methods, struc-
+tured pruning can effectively conserve storage resources and
+enhance inference efficiency on standard hardware by directly
+eliminating entire convolutional kernels or specific channels.
+However, existing pruning methods are primarily tailored for
+classification backbones, such as VGG [17] and ResNet [53].
+In the field of infrared small-target detection, specific feature
+extraction networks [24], [27], [54] are developed to maintain
+the response of small targets in deep layers. Consequently,
+directly applying the existing pruning methods to SIRST
+detection is unsuitable due to the following reasons.
+1) Prematurely Mispruning of Spatial Information for
+SIRST Detection: Superior pruning methods for image
+classification prioritize the preservation of filters con-
+taining class-specific information. However, for infrared
+small-target detection, the existing pruning methods may
+lead to mispruning of position-sensitive filters, resulting
+in significant performance degradation. This is because,
+channels containing abundant spatial details in shallow
+layers may be pruned prematurely, and such spatial
+details are indispensable for the localization of infrared
+small targets.
+2) Isolation Between Pruning Criteria and Infrared
+Images: The evaluation criteria of existing pruning meth-
+ods utilize statistical measures inherent in the parameters
+(e.g., ℓ1 norm [34] and geometric median [18]) to rank
+the contributions of weights, activation, or gradients, and
+identify “unimportant” neurons for pruning. However,
+in infrared images, the target signal is characterized
+by low energy, small size, and often low amplitude.
+As a result, the existing evaluation criteria may lead to
+the inadvertent removal of channels containing crucial
+information about small targets. We hypothesize that this
+is due to the fact that current channel pruning methods
+evaluate significance in an isolation mannner from input
+and lack a connection between pruning criteria and the
+intrinsic properties of the data.
+To address these issues, in this article, we propose a pruning
+framework customized for SIRST detection networks, termed
+sparsity-aware global channel pruning (SAGCP), which can
+facilitate lossless compression to significantly improve model
+efficiency while maintaining detection performance (as shown
+in Fig. 1). Specifically, we introduce a sparse constraint layer
+to utilize the sparse prior to reconstruct the input infrared
+Fig. 2. Block diagrams of two types of channel pruning. (a) Traditional
+pruning procedure requires specific criteria to identify unimportant channels
+and fine-tuning to restore performance. (b) Our method directly learns a
+structured sparsity model from the inputs, without well-designed metrics.
+image. Due to the sparsity of the reconstructed feature map,
+it can be employed for training redundant feature maps across
+channels to achieve fast sparsity. In the initial phase of the
+network, our pruning method performs sparse modeling of the
+target, which can prevent the loss of target features in shallow
+layers. Furthermore, SAGCP does not necessitate the design
+of extra structures or metrics to account for the impact of filter
+weight magnitude and can mitigate the performance degrada-
+tion resulting from improperly pruning filters with low weights
+(as shown in Fig. 2). By directly removing unresponsive chan-
+nels in a simpler way, our method can significantly decrease
+the computational and storage resources, thus further facilitat-
+ing the deployment of infrared small-target detection networks.
+In summary, the contributions of this article can be summa-
+rized as follows.
+1) We develop a lossless pruning paradigm tailored for an
+infrared small-target detection network, and propose an
+SAGCP framework.
+2) The proposed method does not require extra metrics
+to identify redundant channels but directly utilizes the
+sparsity of the input image, it can enhance the inference
+efficiency but maintain the detection performance.
+3) Experiments on different datasets demonstrate the supe-
+rior performance. When applying SAGCP to existing
+SIRST detection networks, the results validate the effec-
+tiveness and universality of our method.
+This article is organized as follows. In Section II, we briefly
+review the related work. In Section III, we introduce the
+architecture of our SAGCP in detail. The experimental results
+are represented in Section IV. Section V gives the conclusion.
+II. R ELATED WORKS
+In this section, we first review the main research of infrared
+small-target detection. Subsequently, we introduce the channel
+pruning technology and its application for infrared small-target
+detection.
+A. Single-Frame Infrared Small-Target Detection
+Traditional infrared small-target detection mainly includes
+low-rank sparse decomposition [33], [60], [61] and local
+contrast-based methods [15], [16], [59]. These methods rely on
+assumptions about the target or background, assuming that the
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+WU et al.: SAGCP FOR INFRARED SMALL-TARGET DETECTION NETWORKS 5615011
+target is sparse or the background changes slowly. As a result,
+these methods often lack the semantic distinction between the
+targets and the background clutters in real scenes. Moreover,
+the hand-made adjustment of hyperparameters poses chal-
+lenges for these methods in addressing complex and variable
+scenarios.
+Deep learning has been widely applied in target detection,
+and the CNN-based method for infrared small-target detection
+has yielded promising results. For example, Wang et al. [49]
+decomposed infrared small-target detection into two sub-
+tasks and employed a conditional generative adversarial
+network (cGAN) to achieve a balance between miss detection
+and false alarm. Dai et al. [5] developed a high-quality dataset
+for SIRST detection, and proposed attentional local contrast
+network (ALCNet) [6], which can effectively utilize the feature
+learning ability of deep networks and the physical inter-
+pretability of model-driven methods. Li et al. [27] designed
+a dense nested interactive module (DNIM) and a cascaded
+channel and spatial attention module (CSAM), to effec-
+tively preserve detailed target information in deep layers.
+Zhang et al. [63] proposed infrared shape network (ISNet)
+which combined shape reconstruction with the detection of
+small infrared targets. Ma et al. [37] utilized saliency label-
+ing and multilayer feature fusion for infrared small-target
+detection. Instead of utilizing complex feature fusion modules,
+Kou et al. [25] integrated regular convolutions, depthwise
+separable convolutions, atrous convolutions, and asymmet-
+ric convolutions modules to develop a lightweight network
+for infrared small-target detection. Li et al. [28] proposed an
+MDAF module as the backbone network to enhance feature
+reuse and preserve the features of infrared small target features
+in deep layers. Despite the potential for robust detection per-
+formance, complicated networks often entail a higher memory
+allocation and increased computational resources.
+B. Channel Pruning
+Channel pruning reduces the number of parameters and
+computational complexity of the model by removing channels
+(or filters) with minimal impact on the final task, thereby
+facilitating deployment on resource-constrained devices and
+enhancing inference speed. The process of channel pruning
+typically consists of three stages: first, pretraining to acquire
+initial model weights; second, designing importance metrics
+to prune channels with less saliency; and finally, fine-tuning
+to recover the performance degradation resulting from prun-
+ing. Li et al. [29] pruned filters by evaluating the weight
+norm magnitude to eliminate ones with minimal impact on
+output accuracy. He et al. [18] proposed a new importance
+metric that moves away from the concept of “small norm-
+unimportant” and identified substitutable filters by computing
+their geometric medians. Chen et al. [4] designed a typical
+three-stage global channel pruning method to identify unim-
+portant channels to prune by integrating global and local
+channel importance indicators. Sui et al. [44] proposed a filter
+pruning method based on channel independence to evaluate
+the significance of filters by quantifying the inter-feature map
+correlation. Zhao et al. [65] developed a channel similarity
+metric which quantifies differences between channels through
+Fig. 3. Visualization of feature maps after the ReLU layers. (a) and
+(b) Downsample and upsample layers of DNA-Net [27]. (c)–(e) Different
+layers in HoLoCoNet [3]. Note that, sparsity is defined as the ratio of zeros
+in the corresponding channels. We mark the proportion of channels exhibiting
+sparsity greater than 0.5.
+probabilistic modeling, and proposed a channel pruning frame-
+work based on hierarchical clustering. By visualizing feature
+maps of different channel activations, Zhang et al. [64] devel-
+oped a classwise mask to determine the contribution of each
+channel for image classification.
+However, the existing pruning methods are mainly aimed
+at image classification tasks and pay more attention to class-
+sensitive features, often overlooking the feature correlation of
+the interchannels. In contrast, infrared small-target detection
+prioritizes feature aggregation and places greater emphasis
+on location-sensitive features. As a result, direct pruning of
+the network will lead to a significant degradation in the
+performance of infrared small-target detection. Therefore, it is
+essential to develop a pruning technique tailored for the SIRST
+detection network based on the inherent characteristics of
+infrared small targets.
+C. Sparsity for Model Pruning
+Sparse training for convolutional neural networks is typi-
+cally implemented by imposing sparsity constraints, leveraging
+unsaturated activation values, or employing specific sparsity
+techniques. For example, Liu et al. [34] induced channel-level
+sparsity through regularization on the scaling factor of the
+batch-normalized layers. Wen et al. [50] employed lasso regu-
+larization to directly learn the structure of compressible filters,
+channels, and layer depths in the network during the training
+stage. Huang and Wang [21] scaled the output of a specific
+structure in a CNN, such as neurons, groups, or residual
+blocks, by applying sparse regularization constraints on the
+scaling factor. Lin et al. [32] aimed to achieve an optimal
+tradeoff between minimizing loss and selecting filters by incor-
+porating two different structural sparse regularization terms
+into the original objective loss function of pruning. These
+sparse training methods lack clear guidance, it is easy to fall
+into local optimal solutions when they are directly applied to
+infrared small-target detection.
+III. M ETHODOLOGY
+A. Motivation
+In this section, we analyze the sparsity of infrared
+images and the redundancy in existing small-target detection
+networks. The sparsity statistics are illustrated in Fig. 3.
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+5615011 IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING, VOL. 63, 2025
+Specifically, Fig. 3(a) and (b) represents the statistics of the
+first Conv-BN-ReLU in the downsampling layer and the cor-
+responding upsampling layer in DNA-Net [27], Fig. 3(b)–(d)
+represents the statistics of the first Conv-BN-ReLU in different
+layers in HoLoCoNet [3]. It is evident that the spatial sparsity
+of different channels exhibits significant variation. Further-
+more, a large number of channels demonstrate high sparsity
+in deep layers, with only marginal regions being activated.
+It indicates that it is unnecessary to compute these unactivated
+low-frequency regions. In conclusion, the SIRST detection
+methods selectively activate a limited number of channels for
+background regions while activating more channels for critical
+target areas. Inspired by the observation, we leverage the
+inherent sparsity of infrared images to prune SIRST detection
+networks for efficient inference.
+B. Sparse-Aware Global Channel Pruning
+Based on the inherent sparsity of infrared inputs, we employ
+sparse modeling to reconstruct high-level features to induce the
+sparsity of the model.
+Given a set of infrared training data {xi , yi }N i=1, where xi
+represents the infrared input image, and yi is the corresponding
+ground truth. The SIRST detection problem based on deep
+learning can be formulated as follows:
+min
+W
+1
+N
+NX
+i
+L(yi , 2(xi , ω)) (1)
+where L represents the loss function, we use Dice loss [38] as
+target loss function to keep the balance between targets and
+background pixels. 2(·, ω)and ω represent the trainable deep
+neural networks and the model parameters, respectively.
+1) Generative Layer via Sparse Modeling: Given an
+infrared image x ∈ RCin×H ×W , where Cin and H and W
+denote the input channels and spatial dimensions of the
+image, respectively. Our aim is to reconstruct the input x
+by the sparse features z. Specifically, we denote z as z .=
+(ζ1, . . . , ζC , . . . , ζCout) ∈ RCout×H ×W , where each ζC ∈ RH ×W
+(presumably sparse), and the filter F is denoted as follows:
+F .=
+
+
+f11 . . . f1Cout
+... . . . ...
+fCin1 · · ·fCinCout
+
+ ∈ RCout×Cin×k×k (2)
+where fi j ∈ Rk×k represents a convolutional kernel of size
+k × k. Then, the input x can be regenerated through the
+operator defined as follows:
+x = F (z) .=
+CoutX
+c=1
+( f1c ∗ ζc, . . . ,fCinc ∗ ζc). (3)
+Equation (3) defines the sparse modeling layer F (·), which
+transforms x into a high-level sparse representation z∗ ∈
+RCout×H ×W , and utilizes the sparse priors to reconstruct the
+infrared input as a linear combination of several sparse
+channels. The sparse constraint layer F (·) is encoded as a
+convolutional layer and used at the first layer of the detection
+network, it can pay more attention to the spatial information
+of the infrared small target in the shallow layers.
+Inspired by the convolutional sparse coding model
+(CSC-layer) [30], we can obtain the optimal sparse solution z∗
+by solving the following Lasso optimization problems:
+z∗ = arg min
+z
+λ∥z∥1 + 1 2 ∥x − F (z)∥2 2 (4)
+where z represents the locations and magnitudes of filters in
+F to be linearly combined and z∗ is a high-level feature repre-
+sentation based on sparsity constraints. Equation (4) enforces
+sparsity in z through the elementwise ℓ1 norm and utilizes the
+ℓ2 norm of the residual x − F (z) to control reconstruction
+error. The sparse modeling layer F (·) aims to reconstruct the
+input x utilizing F (z), i.e., find the smallest z to minimize the
+reconstruction error between x and F (z) and the parameters
+of z are as few as possible.
+2) F orward Propagation of Sparse Coding Layers: The
+forward propagation of sparse coding layers can be performed
+by solving the optimization problem of (4). We employ the
+fast iterative shrinkage-thresholding algorithm (FISTA) [2] for
+implementation. The FISTA algorithm starts with an arbitrarily
+initialized z (here z[0] = 0), introduces an auxiliary variable p
+initialized to p[1] = z[0], and a scalar m initialized to m1 = 1.
+The following steps are performed iteratively for ℓ ≥ 1
+z[ℓ] = Tλt   p[ℓ] + tF ∗  x − F   p[ℓ]
+mℓ+1 =
+1 +
+q
+1 + 4m2 ℓ
+2
+p[ℓ+1] = z[ℓ] + mℓ − 1 mℓ+1   z[ℓ] − z[ℓ−1] (5)
+where ℓ is the number of iterations, F ∗(·) is the adjoint
+operator of F (·), and it is defined as follows:
+F ∗(x) =
+CinX
+c=1
+( fc1 ∗ ζc, . . . ,fcCout ∗ ζc). (6)
+The FISTA iteration automatically generates a nonlinear
+operator Tλt, which represents an elementwise shrinkage
+threshold operator on the input. For scalar µ ∈ R, the
+shrinkage thresholding operation is defined as follows:
+Tλt (µ) .= max(|µ| − λt, 0) · sgn(µ) (7)
+where the parameter t is the step size of the FISTA iteration.
+Equation (5) converges to the solution of (4) as long as the
+step t is smaller than the inverse of the dominant eigenvalue
+of operator F T (F (·)). We estimate the eigenvalue through
+a power iteration method, which iteratively performs the
+following calculations:
+ε[ℓ+1] ← ˜ε
+[ℓ+1]
+˜ε [ℓ+1] 
+2
+(8)
+where ˜ε[ℓ+1] = F T (F (ε[ℓ])). The iteration is terminated when
+the elementwise ℓ2 norm of ε[ℓ+1] − ε[ℓ] is smaller than a
+predefined threshold (we use
+√
+10−5) or when the maximum
+number of iterations is reached (we use 50). Assuming that
+after ℓ iterations, the estimated dominant eigenvalue can be
+derived as follows:
+λℓ =
+
+ε[ℓ], F ∗F ε[ℓ] . (9)
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+WU et al.: SAGCP FOR INFRARED SMALL-TARGET DETECTION NETWORKS 5615011
+Fig. 4. Illustration of our SAGCP-Det. The white boxes with red fork correspond to the feature channels eligible for pruning. Input image is fed sequentially
+into the sparse coding module to reconstruct the sparse target regions F (z) and sparse feature extraction module to learn layerwise sparsity, where PPM
+represents a pyramid pooling module in [66].
+We set t to a value less than 1/λ ℓ to guarantee the conver-
+gence of the FISTA algorithm, here we set t = 0.9/λℓ. The
+dominant eigenvalue of F T (F (·)) changes after each update of
+the layer parameter F. Therefore, during the training process,
+λℓ is calculated after each parameter update. After training is
+complete, λℓ can be fixed during the testing process without
+any additional inference cost.
+When propagated forward, the above iterative process auto-
+matically generates a network architecture constructed by
+the unfold optimization of FISTA algorithm, which can be
+propagated backward by autodifferentiation. Consequently, the
+sparse features can be directly incorporated into the training
+process to obtain a sparse model.
+C. SAGCP-Det
+As shown in Fig. 4, we propose a lightweight infrared
+small-target detection network. It takes an infrared image as
+input and utilizes the sparse coding layer to map the infrared
+image to sparse features. Subsequently, the sparse feature
+extraction and feature fusion are performed to obtain the
+final detection results. The trained model exhibits layer-wise
+sparsity, wherein each layer of the network is characterized by
+a significant number of channels with zero response values.
+By directly removing unresponsive channels in a simpler way,
+our method efficiently sparsifies the feature map and learns
+robust features using interpretable layers in a more straightfor-
+ward manner. The framework of the proposed SAGCP pruning
+strategy is shown in Algorithm 1.
+IV. E XPERIMENTS
+A. Datasets and Implementation
+1) Dataset Description: We conduct experiments on the
+public datasets, i.e., NUAA-SIRST [5] and IRSTD-1k [63].
+The NUAA-SIRST dataset is widely used for infrared
+small-target detection and contains 427 images from hundreds
+of real-world videos of different scenarios. The IRSTD-1k
+dataset is a newly developed large infrared small-target detec-
+tion dataset, and contains 1000 realistic images with different
+targets in high diversity. We followed [63] to split the training,
+validation, and testing sets of the NUAA-SIRST and IRSTD-
+1k datasets.
+2) Implementation Details: The input images with different
+initial sizes were first resized to a resolution of 256 × 256,
+and then normalized before being fed into the network.
+Algorithm 1 SAGCP for Infrared Small-Target Detection
+Networks
+Input: Training data {xi , yi }N i=1, an SIRST detection network
+with CSC-layers 2(., ω,λ),
+Output: The compact model.
+1: Initialize:z[0] = 0, p[1] = z[0], m1 = 1. Train the network
+2(., ω,λ) as Equ. (4) to obtain learned parameters ω∗.
+2: while ℓ ≥ 1 do
+3: Find the nonlinear operator Tλt by solving the problem
+in Equ. (5).
+4: if
+ε[ℓ+1] − ε[ℓ] 2 < √ 10−5 or ℓ <50 then
+5: Estimate the eigenvalue by Equ. (8) and Equ. (9).
+6: end if
+7: end while
+Set t = 0.9
+
+λℓ, the Equ. (5) converges to the solution
+of Equ. (4), and obtain a sparse model with layer-wise
+sparsity.
+Prune the redundant channels with zero response.
+8: return Compact model.
+Our network was optimized by the AdaGrad method [9] with
+a weight decay of 1 × 10−4, and was initialized using the
+Xavier strategy [11]. We adopted CosineAnnealingLR [43]
+scheduler with a learning rate of 0.05. We set the batch size
+to 16 and the epoch number to 600. All the experiments were
+implemented in PyTorch on a computer with an NVIDIA
+GeForce RTX 3090 GPU.
+3) Evaluation Metrics: We adopted the widely used metrics
+for quantitative evaluation of detection performance, i.e., inter-
+section over union (IoU) to compare the shape similarities
+between the prediction and the ground truth, probability of
+detection ( Pd) and false-alarm rate ( Fa) to describe the local-
+ization ability. Moreover, the receiver operation characteristics
+curve (ROC) was used to describe the changing trends of Pd
+with varying Fa.
+As a single metric, the number of parameters or FLOPs,
+is insufficient to accurately measure model efficiency of the
+pruned model, we develop a new metric, i.e., parameter-FLOPs
+ratio (PFr) score, to evaluate the efficiency of pruning methods
+comprehensively
+PFr = 2 1
+#Params + 1 #FLOPs (10)
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+5615011 IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING, VOL. 63, 2025
+TABLE I
+COMPARISON OF DETECTION PERFORMANCE (IoU(%), Pd (%),
+Fa( × 10−6)), AND MODEL EFFICIENCY [THE NUMBER OF
+PARAMETERS (M), T HEORETICAL FLOPs (G) AND FRAME
+PER SECOND (FPS)] OF DIFFERENT METHODS ON THE
+NUAA-SIRST AND IRSTD-1 K DATASETS . THE BEST
+AND SECOND BEST RESULTS ARE Highlighted
+AND UNDERLINED
+where “#Params” denotes the ratio at which the number of
+parameters declined and “#FLOPs” represents the ratio of
+FLOPs declined.
+B. Comparison to State-of-the-Art IR Methods
+For traditional methods, we choose two filter-based methods
+(Top-Hat [41] and Max-Median [8]), two local contrast-based
+methods (WSLCM [16] and TLLCM [15]), and two low
+rank-based methods (IPI [10] and PSTNN [61]) for per-
+formance comparison. For deep learning-based methods,
+we select MDvsFA [49], ISTDU-Net [20], DNA-Net [27],
+UIU-Net [54], RDIAN [45], HoLoCoNet [3], the latest
+RepISD-Net [52], and IRPruneDet [62] as compared methods.
+It is worth noting that our SAGCP-Det uses RepISD-Net with
+Vanilla conv as the baseline network.
+1) Quantitative Results: As illustrated in Table I, our
+SAGCP-Det exhibits competitive results in both detection
+accuracy and model efficiency. Due to the reliance on hand-
+crafted features and prior knowledge, traditional methods
+face significant challenges to deal with the rapidly chang-
+ing real-world scenarios. In contrast, deep learning methods
+can achieve superior detection performance (in terms of
+IoU and Pd). However, the promising performance of deep
+learning methods often comes with increased computational
+demands. For instance, the number of parameters and FLOPs
+of UIU-Net are 50.54 M and 54.46 G, respectively, and
+even FLOPs of MDvsFA can reach 264.96 G, they need
+more storage and computational resources. When compared
+to the Transformer-based deep learning method progres-
+sive background-aware transformer (PBT) [58], our method
+demonstrates superior detection performance and model effi-
+ciency. The vision transformer typically employs hierarchical
+structures, which requires more inference time. In terms of
+Fig. 5. ROC performance of different methods on (a) NUAA-SIRST And
+(b) IRSTD-1k datasets.
+actual inference efficiency, our method can detect more than
+400 frames images per second, which is much faster than the
+speed of existing deep learning methods. It demonstrates that
+SAGCP-Det exhibits not only superior detection performance
+but also promising inference efficiency.
+IRPruneDet is the first pruning method designed for the
+SIRST detection network. It employs UNet-18 as the baseline
+network and carries out wavelet structure-regularized soft
+channel pruning, which decreases the number of parameters
+and FLOPs. IRPruneDet utilizes ℓ1 norm to evaluate the
+importance of channels after the wavelet transformation of the
+convolutional layer. However, in infrared images, smaller norm
+is not less important, thus, IRPruneDet may incur some per-
+formance degradation. In contrast, the proposed SAGCP-Det
+demonstrates superior detection performance (75.12 versus
+77.52 in IoU) and further reduces the number of parameters
+(0.18 M versus 0.06 M). Our SAGCP-Det performs sparse
+reconstruction of infrared inputs directly, which can effectively
+reduce the modeling loss for the targets.
+The ROC performance curves of different methods on
+NUAA-SIRST and IRSTD-1k are shown in Fig. 5. It can be
+observed that our SAGCP-Det demonstrates superior perfor-
+mance compared to other methods when dynamic thresholds
+are employed. Specifically, the ROC curve of WSLCM cannot
+be visualized within the selected coordinate interval on the
+NUAA-SIRST dataset. For the more challenging IRSTD-1k
+datasets characterized by strong clutter interference and signif-
+icant target morphological variations, our SAGCP-Det exhibits
+a more stable detection performance compared with other
+methods.
+2) Visual Results: We visualize the results of different
+methods in Fig. 6. It is evident that SAGCP-Det demonstrates
+superior target detection capabilities. When the images con-
+tain target-like interference (e.g., first, third, and fourth test
+images), the traditional methods based on handcrafted fea-
+tures are prone to generating false alarms, while HoLoCoNet
+and DNA-Net also generate missed detections. In contrast,
+our method accurately locates the targets and reduces the
+probability of false alarms and missed detections. In com-
+plex backgrounds with noise and clutters (e.g., second, fifth,
+and sixth test images), our method also exhibits superior
+target recognition capability compared to other methods.
+Furthermore, for multitarget scenarios (e.g., fifth and sixth
+test images), other comparison methods are prone to missing
+detections, while SAGCP-Det can achieve more accurate target
+detection.
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+WU et al.: SAGCP FOR INFRARED SMALL-TARGET DETECTION NETWORKS 5615011
+Fig. 6. Visual examples of some representative methods. For better visualization, the target area is zoomed in the corner. The correctly detected target, false
+alarm, and miss detection are highlighted by green, red, and yellow boxes, respectively.
+C. Comparisons With Other Pruning Methods
+We conduct extensive experiments to demonstrate the
+effectiveness of the proposed SAGCP framework. We prune
+prevailing SIRST detection models including DNA-Net [27],
+HoLoCoNet [3] and RepISD-Net [52]. We apply SAGCP to
+the aforementioned baseline detection models and compare
+them with general pruning methods including network slim-
+ming (NS) [34] and CHIP [44].
+Pruning Setup: For NS and CHIP pruning methods, we first
+train all the networks from scratch. We then conduct the
+experiment multiple times to determine the optimal sparsity
+rate, followed by a fine-tuning process to restore performance.
+Finally, the global sparse rates selected are DNA-Net (NS 60%
+and CHIP 50%), HoLoCoNet (NS 50% and CHIP 50%), and
+RepISD-Net (NS 60% and CHIP 50%).
+The performance of various pruning methods on differ-
+ent SIRST detection networks for the NUAA-SIRST and
+IRSTD-1k datasets is shown in Tables II and III, respectively.
+Compared with other pruning methods, our SAGCP improves
+the detection performance of baseline networks after pruning.
+In contrast, NS and CHIP cause certain performance degrada-
+tion of the SIRST detection model. NS prunes channels with
+TABLE II
+COMPARISON OF DETECTION PERFORMANCE [IoU(%), Pd (%),
+AND Fa( × 10−6)] AND MODEL EFFICIENCY [NUMBER OF
+PARAMETERS (M), T HEORETICAL FLOPs (G), AND
+INFERENCE SPEED ] OF DIFFERENT SOTA
+METHODS ON THE NUAA-SIRST
+small ℓ1 norm by sorting parameters of the trained model.
+CHIP utilizes similarity measurement on the feature map to
+prune channels which exhibit high similarity. For infrared
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+5615011 IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING, VOL. 63, 2025
+TABLE III
+COMPARISON OF DETECTION PERFORMANCE [IoU(%), Pd (%),
+Fa( × 10−6)] AND MODEL EFFICIENCY [NUMBER OF
+PARAMETERS (M), T HEORETICAL FLOPs (G), AND
+INFERENCE SPEED ] OF DIFFERENT SOTA
+METHODS ON THE IRSTD-1 K
+targets, the ℓ1 norm is small or the feature map is similar,
+and directly pruning them will cause the target to be missed,
+resulting in performance degradation. Our SAGCP performs
+sparse modeling of input images directly at the initial stage
+of training, effectively preserving the features of the targets,
+so it can achieve higher detection performance.
+In the comparison of model efficiency, SAGCP has the
+smallest number of parameters after pruning different SIRST
+detection networks. Although SAGCP does not always exhibit
+the lowest FLOPs, we can achieve the highest PFr. PFr
+provides a comprehensive evaluation of the optimization level
+achieved by various pruning methods in terms of model param-
+eters and FLOPs. The resolution of different layers reduced
+progressively with the network deepens and the shallow layer
+has a larger resolution. Therefore, removing more channels
+in the shallow layers will reduce more FLOPs. However, for
+infrared small targets, their limited features tend to exist more
+in the shallow layers. Thus removing more shallow channels
+may degrade the performance of the SIRST detection methods.
+FPr considers both the reduction in the number of parameters
+and the decrease in FLOPs. Therefore, the PFr can provide
+a more equitable basis for comparing the model efficiency of
+different pruning methods after removing channels at different
+locations.
+In terms of the inference speed, the models compressed
+by different pruning methods can achieve comparable per-
+formance to the origin baseline. It is attributed to the fact
+that each pruning method necessitates modifications to the
+baseline network, such as sparse training or importance-based
+selection, which introduces a marginal increase in network
+complexity. The extent of pruning and the complexity of the
+network together determine the final inference speed of the
+model. It is worth noting that when applying different pruning
+methods on RepISD-Net, the inference speed after pruning
+by SAGCP is slightly lower compared to the NS and CHIP
+methods. This is because the RepISD-Net itself is already
+compact (only 0.28 M), the redundancy in the network is
+already small. NS and CHIP can set the pruning rate arbitrarily,
+Fig. 7. Visual result of SAGCP-Det before and after pruning. The correctly
+detected target, false alarm, and miss detection are highlighted by green, red,
+and yellow boxes, respectively.
+Fig. 8. Comparison of channel numbers after pruning with different pruning
+methods on the IRSTD-1k. (a) Pruning on RepISD-Net. (b) Pruning on
+HoLoCoNet.
+leading to enhanced inference speed. However, the SAGCP
+method selectively prunes network redundancies based on the
+inherent sparsity of infrared small targets, ensuring that the
+network is not overpruned. In addition, RepISD-Net already
+achieves satisfactory inference speed, we are more concerned
+about the model size for deployment on various lightweight
+platforms. Consequently, the SAGCP pruning method enables
+RepISD-Net to maintain comparable inference speed while
+significantly reducing the number of parameters, thereby val-
+idating the effectiveness of the proposed method.
+D. Visual Analysis of Sparsity
+As shown in Fig. 7, we visualize the qualitative result
+of SAGCP-Det before and after pruning. It can be observed
+that compared with the baseline model, the proposed pruned
+network not only detects the target accurately but also achieves
+superior detection performance (especially the inputs 3, 5,
+and 6). The improvement can be attributed to the sparse
+modeling of the target at the initial stages, which can generate
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+WU et al.: SAGCP FOR INFRARED SMALL-TARGET DETECTION NETWORKS 5615011
+Fig. 9. Visualization of channels for different pruning methods. Channels with red bounding boxes represent to be reserved, and the rest ones are to be
+pruned. (a) Sparse training with SAGCP. (b) Sparse training with NS [34].
+more compact and robust features to mitigate the issue of miss
+detection.
+In Fig. 8, we present a comparison of the number of chan-
+nels in each convolutional layer after pruning with different
+methods. The baseline network used for the comparison is
+RepISD-Net. It can be observed that CHIP pruned 50% of
+channels in each convolutional layer, while NS globally prunes
+channels in each layer adaptively, though not completely.
+In contrast, SAGCP facilitates a more adaptive manner for
+channel pruning.
+Furthermore, as shown in Fig. 9, we visualize the feature
+heatmaps of RepISD-Net for different pruning methods. The
+feature channels are from the same convolutional layer in
+the shallow network, and the pruning methods are SAGCP
+and NS [34], respectively. The feature maps with red boxes
+and titles correspond to the channels to be reserved after
+different sparse training methods. After pruning RepISD-Net
+through NS method, there are many reserved channels with-
+out response feature, such as channel 11, 15, 18, 33, 38,
+39, 52, 59, and 62, and pruning only 32 channels. It is
+worth noting the channel with feature response (channel 36)
+is mispruned. It indicates that the NS method is not only
+pruning incompletely but also leads to the incorrectly pruning
+of channels with critical information. The mispruning of
+important channels in shallow layer will cause the target
+features to disappear in the subsequent network, resulting in
+performance degradation. It can be attributed to the fact that
+the existing pruning methods are mainly aimed at image clas-
+sification tasks. NS method employs the ℓ1 norm of network
+weights to measure importance. The pruning metric ignores
+the inherent sparsity of infrared images and is unsuitable
+for infrared small-target detection. In contrast, our SAGCP
+can effectively prune 51 channels, and every channel has no
+feature response, while maintain information in the reserved
+channels. This is because SAGCP directly performs sparse
+modeling on the input infrared images, followed by sub-
+sequent network learning. Consequently, the network learns
+the redundancy for pruning under the guidance of sparse
+priors of infrared small targets. It indicates that our prun-
+ing method is specifically tailored for infrared small-target
+detection tasks and can enhance model efficiency without
+compromising detection performance compared with existing
+methods.
+V. C ONCLUSION
+In this article, we propose an SAGCP framework to address
+the significant storage and computational resource consump-
+tion challenges in SIRST detection networks. Our pruning
+method adaptively removes redundant channels from existing
+infrared small-target detection networks by leveraging the
+sparsity of the infrared images, and it can further improve
+the model efficiency while maintaining the detection perfor-
+mance. Experimental results on public datasets demonstrate
+the effectiveness of our method. Compared to state-of-the-
+art methods, our SAGCP-Det achieves comparable or even
+better detection performance and has significant advantages in
+terms of model size and computational cost. More importantly,
+our pruning framework is compatible with existing SIRST
+detection networks, and the pruned models can achieve compa-
+rable detection results, with the model efficiency significantly
+improved. This study represents an effective exploration of
+the balance between detection performance and inference
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+5615011 IEEE TRANSACTIONS ON GEOSCIENCE AND REMOTE SENSING, VOL. 63, 2025
+efficiency for SIRST networks, and we will persist in our focus
+on the topic in the future.
+REFERENCES
+[1] H. Alqasir, D. Muselet, and C. Ducottet, “Introducing shape priors in
+Siamese networks for image classification,” Neurocomputing, vol. 568,
+Feb. 2024, Art. no. 127034.
+[2] A. Beck and M. Teboulle, “A fast iterative shrinkage-thresholding
+algorithm for linear inverse problems,” SIAM J. Imag. Sci., vol. 2, no. 1,
+pp. 183–202, Jan. 2009.
+[3] G. Chen, Z. Wang, W. Wang, X. Li, and H. Wu, “Holistic modular-
+ization of local contrast in the end-to-end network for infrared small
+target detection,” IEEE Geosci. Remote Sens. Lett., vol. 20, pp. 1–5,
+2023.
+[4] Y . Chen, R. Li, W. Li, J. Wang, and R. Li, “Three-stage global channel
+pruning for resources-limited platform,” IEEE Trans. Neural Netw.
+Learn. Syst., vol. 35, no. 11, pp. 16153–16166, Nov. 2024.
+[5] Y . Dai, Y . Wu, F. Zhou, and K. Barnard, “Asymmetric contextual
+modulation for infrared small target detection,” in Proc. IEEE/CVF
+Winter Conf. Appl. Comput. Vis., Oct. 2021, pp. 950–959.
+[6] Y . Dai, Y . Wu, F. Zhou, and K. Barnard, “Attentional local contrast
+networks for infrared small target detection,” IEEE Trans. Geosci.
+Remote Sens., vol. 59, no. 11, pp. 9813–9824, Nov. 2021.
+[7] L. Deng, Q. Chen, Y . He, X. Sui, Q. Liu, and L. Hu, “Fire detection with
+infrared images using cascaded neural network,” J. Algorithms Comput.
+Technol., vol. 13, Jan. 2019, Art. no. 1748302619895433.
+[8] S. D. Deshpande, M. H. Er, R. Venkateswarlu, and P. Chan, “Max-
+mean and max-median filters for detection of small targets,” Proc. SPIE,
+vol. 3809, pp. 74–83, Jul. 1999.
+[9] J. C. Duchi, E. Hazan, and Y . Singer, “Adaptive subgradient methods
+for online learning and stochastic optimization,” J. Mach. Learn. Res.,
+vol. 12, no. 7, pp. 2121–2159, 2011.
+[10] C. Gao, D. Meng, Y . Yang, Y . Wang, X. Zhou, and A. G. Hauptmann,
+“Infrared patch-image model for small target detection in a single
+image,” IEEE Trans. Image Process., vol. 22, no. 12, pp. 4996–5009,
+Dec. 2013.
+[11] X. Glorot and Y . Bengio, “Understanding the difficulty of training deep
+feedforward neural networks,” in Proc. 13th Int. Conf. Artif. Intell.
+Statist., 2010, pp. 249–256.
+[12] J. Gu et al., “Projection convolutional neural networks for 1-bit CNNs
+via discrete back propagation,” in Proc. AAAI Conf. Artif. Intell., vol. 33,
+2019, pp. 8344–8351.
+[13] J. Guo et al., “Hit-detector: Hierarchical Trinity architecture search
+for object detection,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern
+Recognit. (CVPR), Jun. 2020, pp. 11402–11411.
+[14] T. Guo, B. Zhou, F. Luo, L. Zhang, and X. Gao, “DMFNet: Dual-encoder
+multistage feature fusion network for infrared small target detection,”
+IEEE Trans. Geosci. Remote Sens., vol. 62, 2024, Art. no. 5614214.
+[15] J. Han, S. Moradi, I. Faramarzi, C. Liu, H. Zhang, and Q. Zhao,
+“A local contrast method for infrared small-target detection utilizing
+a tri-layer window,” IEEE Geosci. Remote Sens. Lett., vol. 17, no. 10,
+pp. 1822–1826, Oct. 2020.
+[16] J. Han et al., “Infrared small target detection based on the weighted
+strengthened local contrast measure,” IEEE Geosci. Remote Sens. Lett.,
+vol. 18, no. 9, pp. 1670–1674, Sep. 2021.
+[17] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for
+image recognition,” in Proc. IEEE Conf. Comput. Vis. Pattern Recognit.
+(CVPR), Jun. 2016, pp. 770–778.
+[18] Y . He, P. Liu, Z. Wang, Z. Hu, and Y . Yang, “Filter pruning via geometric
+median for deep convolutional neural networks acceleration,” in Proc.
+IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (CVPR), Jun. 2019,
+pp. 4335–4344.
+[19] Q. Hou, Z. Wang, F. Tan, Y . Zhao, H. Zheng, and W. Zhang, “RISTDnet:
+Robust infrared small target detection network,” IEEE Geosci. Remote
+Sens. Lett., vol. 19, pp. 1–5, 2021.
+[20] Q. Hou, L. Zhang, F. Tan, Y . Xi, H. Zheng, and N. Li, “ISTDU-net:
+Infrared small-target detection U-Net,” IEEE Geosci. Remote Sens. Lett.,
+vol. 19, pp. 1–5, 2022.
+[21] Z. Huang and N. Wang, “Data-driven sparse structure selection for deep
+neural networks,” in Proc. IEEE/CVF Conf. Eur . Conf. Comput. Vis.,
+Jan. 2018, pp. 317–334.
+[22] R. Kou et al., “MCGC: A multiscale chain growth clustering
+algorithm for generating infrared small target mask under single-
+point supervision,” IEEE Trans. Geosci. Remote Sens., vol. 62, 2024,
+Art. no. 5620412.
+[23] R. Kou et al., “Infrared small target segmentation networks: A survey,”
+Pattern Recognit., vol. 143, Nov. 2023, Art. no. 109788.
+[24] R. Kou, C. Wang, Y . Yu, Z. Peng, F. Huang, and Q. Fu, “Infrared
+small target tracking algorithm via segmentation network and multi-
+strategy fusion,” IEEE Trans. Geosci. Remote Sens., vol. 61, 2023,
+Art. no. 5612912.
+[25] R. Kou et al., “LW-IRSTNet: Lightweight infrared small target seg-
+mentation network and application deployment,” IEEE Trans. Geosci.
+Remote Sens., vol. 61, 2023, Art. no. 5621313.
+[26] W.-C. Law et al., “Manganese-doped near-infrared emitting nanocrys-
+tals for in vivo biomedical imaging,” Opt. Exp., vol. 24, no. 16,
+pp. 17553–17561, 2016.
+[27] B. Li et al., “Dense nested attention network for infrared small target
+detection,” IEEE Trans. Image Process., vol. 32, pp. 1745–1758, 2023.
+[28] C. Li, Y . Zhang, Z. Shi, Y . Zhang, and Y . Zhang, “Moderately dense
+adaptive feature fusion network for infrared small target detection,”IEEE
+Trans. Geosci. Remote Sens., vol. 62, 2024, Art. no. 5616712.
+[29] H. Li, A. Kadav, I. Durdanovic, H. Samet, and H. P. Graf, “Pruning
+filters for efficient convnets,” in Proc. Int. Conf. Learn. Represent., 2017,
+pp. 1–13.
+[30] X. Dai et al., “Revisiting sparse convolutional model for visual
+recognition,” in Proc. Adv. Neural Inf. Process. Syst., vol. 35, 2022,
+pp. 10492–10504.
+[31] Y . Li, S. Gu, C. Mayer, L. Van Gool, and R. Timofte, “Group sparsity:
+The Hinge between filter pruning and decomposition for network
+compression,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit.
+(CVPR), Jun. 2020, pp. 8018–8027.
+[32] S. Lin, R. Ji, Y . Li, C. Deng, and X. Li, “Toward compact ConvNets via
+structure-sparsity regularized filter pruning,” IEEE Trans. Neural Netw.
+Learn. Syst., vol. 31, no. 2, pp. 574–588, Feb. 2020.
+[33] T. Liu, J. Yang, B. Li, Y . Wang, and W. An, “Infrared small target
+detection via nonconvex tensor tucker decomposition with factor prior,”
+IEEE Trans. Geosci. Remote Sens., vol. 61, 2023, Art. no. 5617317.
+[34] Z. Liu, J. Li, Z. Shen, G. Huang, S. Yan, and C. Zhang, “Learning
+efficient convolutional networks through network slimming,” in Proc.
+IEEE Int. Conf. Comput. Vis. (ICCV), Oct. 2017, pp. 2736–2744.
+[35] T. Ma et al., “MCDNet: An infrared small target detection network
+using multi-criteria decision and adaptive labeling strategy,”IEEE Trans.
+Geosci. Remote Sens., vol. 62, 2024, Art. no. 5613414.
+[36] T. Ma, H. Wang, J. Liang, J. Peng, Q. Ma, and Z. Kai, “MSMA-net: An
+infrared small target detection network by multiscale super-resolution
+enhancement and multilevel attention fusion,” IEEE Trans. Geosci.
+Remote Sens., vol. 62, 2024, Art. no. 5602620.
+[37] T. Ma, Z. Yang, Y .-F. Song, J. Liang, and H. Wang, “DMEF-net:
+Lightweight infrared dim small target detection network for lim-
+ited samples,” IEEE Trans. Geosci. Remote Sens., vol. 61, 2023,
+Art. no. 5626015.
+[38] F. Milletari, N. Navab, and S. Ahmadi, “V-Net: Fully convolutional
+neural networks for volumetric medical image segmentation,” in Proc.
+4th Int. Conf. 3D Vis. (3DV), Oct. 2016, pp. 565–571.
+[39] D. Pang, P. Ma, Y . Feng, T. Shan, R. Tao, and Q. Jin, “Tensor spectral
+K-support norm minimization for detecting infrared dim and small target
+against urban backgrounds,” IEEE Trans. Geosci. Remote Sens., vol. 61,
+2023, Art. no. 5002513.
+[40] D. Pang, T. Shan, Y . Ma, P. Ma, T. Hu, and R. Tao, “LRTA-SP: Low
+rank tensor approximation with saliency prior for small target detection
+in infrared videos,” IEEE Trans. Aerosp. Electron. Syst., early access,
+Oct. 4, 2024, doi: 10.1109/TAES.2024.3474652.
+[41] J. F. Rivest and R. Fortin, “Detection of dim targets in digital infrared
+imagery by morphological image processing,” Opt. Eng., vol. 35, no. 7,
+pp. 1886–1893, Jul. 1996.
+[42] O. Ronneberger, P. Fischer, and T. Brox, “U-Net: Convolutional net-
+works for biomedical image segmentation,” in Proc. 18th Int. Conf. Med.
+Image Comput. Comput.-Assist. Intervent., vol. 9351. Munich, Germany:
+Springer, 2015, pp. 234–241.
+[43] L. N. Smith and N. Topin, “Super-convergence: Very fast training of
+neural networks using large learning rates,” Proc. SPIE, vol. 11006,
+pp. 369–386, May 2019.
+[44] Y . Sui, M. Yin, Y . Xie, H. Phan, S. A. Zonouz, and B. Yuan,
+“Chip: Channel independence-based pruning for compact neural net-
+works,” in Proc. Adv. Neural Inf. Process. Syst. (NIPS), vol. 34, 2021,
+pp. 24604–24616.
+[45] H. Sun, J. Bai, F. Yang, and X. Bai, “Receptive-field and direction
+induced attention network for infrared dim small target detection with a
+large-scale dataset IRDST,” IEEE Trans. Geosci. Remote Sens., vol. 61,
+2023, Art. no. 5000513.
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 
+WU et al.: SAGCP FOR INFRARED SMALL-TARGET DETECTION NETWORKS 5615011
+[46] Y . Sun, J. Yang, and W. An, “Infrared dim and small target detection via
+multiple subspace learning and spatial–temporal patch-tensor model,”
+IEEE Trans. Geosci. Remote Sens., vol. 59, no. 5, pp. 3737–3752,
+May 2021.
+[47] C. Tan and J. Liu, “Improving knowledge distillation with a customized
+teacher,” IEEE Trans. Neural Netw. Learn. Syst., vol. 35, no. 2,
+pp. 2290–2299, Feb. 2024.
+[48] R. Varghese and M. Sambath, “YOLOv8: A novel object detection
+algorithm with enhanced performance and robustness,” in Proc. Int.
+Conf. Adv. Data Eng. Intell. Comput. Syst. (ADICS), Apr. 2024, pp. 1–6.
+[49] H. Wang, L. Zhou, and L. Wang, “Miss detection vs. false alarm: Adver-
+sarial learning for small object segmentation in infrared images,” inProc.
+IEEE/CVF Int. Conf. Comput. Vis. (ICCV), Oct. 2019, pp. 8509–8518.
+[50] W. Wen, C. Wu, Y . Wang, Y . Chen, and H. Li, “Learning structured
+sparsity in deep neural networks,” in Proc. Adv. Neural Inf. Process.
+Syst., 2016, pp. 2082–2090.
+[51] J. Wu, C. Leng, Y . Wang, Q. Hu, and J. Cheng, “Quantized convolutional
+neural networks for mobile devices,” in Proc. IEEE Conf. Comput. Vis.
+Pattern Recognit. (CVPR), Jun. 2016, pp. 4820–4828.
+[52] S. Wu, C. Xiao, L. Wang, Y . Wang, J. Yang, and W. An, “RepISD-net:
+Learning efficient infrared small-target detection network via structural
+re-parameterization,” IEEE Trans. Geosci. Remote Sens., vol. 61, 2023,
+Art. no. 5622712.
+[53] S. Wu, C. Xiao, X. Ying, L. Wang, J. Yang, and W. An, “Learning
+scalable dynamic filter in convolutional networks,” Pattern Recognit.
+Lett., vol. 176, pp. 83–88, Oct. 2023.
+[54] X. Wu, D. Hong, and J. Chanussot, “UIU-Net: U-Net in U-Net for
+infrared small object detection,” IEEE Trans. Image Process., vol. 32,
+pp. 364–376, 2023.
+[55] C. Xiao et al., “Highly efficient and unsupervised framework for moving
+object detection in satellite videos,” IEEE Trans. Pattern Anal. Mach.
+Intell., vol. 46, no. 12, pp. 11532–11539, Dec. 2024.
+[56] C. Xiao et al., “Incorporating deep background prior into model-based
+method for unsupervised moving vehicle detection in satellite videos,”
+IEEE Trans. Geosci. Remote Sens., vol. 61, 2023, Art. no. 5603114.
+[57] C. Xiao et al., “DSFNet: Dynamic and static fusion network for moving
+object detection in satellite videos,” IEEE Geosci. Remote Sens. Lett.,
+vol. 19, pp. 1–5, 2021.
+[58] H. Yang et al., “PBT: Progressive background-aware transformer for
+infrared small target detection,” IEEE Trans. Geosci. Remote Sens. ,
+vol. 62, 2024, Art. no. 5004513.
+[59] L. Yang, X. Deng, J. Yu, X. Li, Q. Tian, and L. Zhai, “A fast-local
+contrast method based on information entropy for small target detection,”
+in Proc. IEEE 2nd Int. Conf. Electron. Technol. (ICET) , May 2019,
+pp. 530–533.
+[60] L. Zhang, L. Peng, T. Zhang, S. Cao, and Z. Peng, “Infrared small
+target detection via non-convex rank approximation minimization joint
+l2,1 norm,” Remote Sens., vol. 10, no. 11, p. 1821, Nov. 2018.
+[61] L. Zhang and Z. Peng, “Infrared small target detection based on partial
+sum of the tensor nuclear norm,” Remote Sens., vol. 11, no. 4, p. 382,
+Feb. 2019.
+[62] M. Zhang, H. Yang, J. Guo, Y . Li, X. Gao, and J. Zhang, “IRPruneDet:
+Efficient infrared small target detection via wavelet structure-regularized
+soft channel pruning,” in Proc. AAAI Conf. Artif. Intell., vol. 38,
+Mar. 2024, pp. 7224–7232.
+[63] M. Zhang, R. Zhang, Y . Yang, H. Bai, J. Zhang, and J. Guo, “ISNet:
+Shape matters for infrared small target detection,” in Proc. IEEE/CVF
+Conf. Comput. Vis. Pattern Recognit. (CVPR) , Jun. 2022, pp. 877–886.
+[64] Y . Zhang et al., “Carrying out CNN channel pruning in a white box,”
+IEEE Trans. Neural Netw. Learn. Syst., vol. 34, no. 10, pp. 7946–7955,
+Oct. 2023.
+[65] C. Zhao, Y . Zhang, and B. Ni, “Exploiting channel similarity for network
+pruning,” IEEE Trans. Circuits Syst. Video Technol., vol. 33, no. 9,
+pp. 5049–5061, Sep. 2023.
+[66] H. Zhao, J. Shi, X. Qi, X. Wang, and J. Jia, “Pyramid scene parsing
+network,” in Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (CVPR),
+Jul. 2017, pp. 2881–2890.
+[67] G. Zhou, Y . Fan, R. Cui, W. Bian, X. Zhu, and K. Gai, “Rocket launch-
+ing: A universal and efficient framework for training well-performing
+light net,” in Proc. AAAI Conf. Artif. Intell., vol. 32, Jan. 2018,
+pp. 4580–4587.
+Shuanglin Wu received the B.E. degree from Nan-
+jing University of Science and Technology (NJUST),
+Nanjing, China, in 2017. She is currently pursuing
+the Ph.D. degree with the College of Electronic
+Science and Technology, NUDT, Changsha, China.
+Her research interests include infrared small-target
+detection and model compression.
+Chao Xiao received the B.E. degree in the com-
+munication engineering and the M.E. and Ph.D.
+degrees in information and communication engi-
+neering from the National University of Defense
+Technology (NUDT), Changsha, China, in 2016,
+2018, and 2023, respectively.
+He is currently a Lecturer with the College of
+Electronic Science, NUDT. His research interests
+include deep learning, small object detection, and
+multiple object tracking.
+Yingqian Wang (Member, IEEE) received the B.E.
+degree in electrical engineering from Shandong Uni-
+versity, Jinan, China, in 2016, and the master’s and
+Ph.D. degrees in information and communication
+engineering from the National University of Defense
+Technology (NUDT), Changsha, China, in 2018
+and 2023, respectively.
+He is currently a Lecturer with the College of Elec-
+tronic Science and Technology, NUDT. His research
+interests focus on optical imaging and detection,
+particularly on light field imaging and image
+super-resolution.
+Jungang Yang received the B.E. and Ph.D. degrees
+from the National University of Defense Technol-
+ogy (NUDT), Changsha, China, in 2007 and 2013,
+respectively.
+He was a Visiting Ph.D. Student with the Uni-
+versity of Edinburgh, Edinburgh, U.K., from 2011
+to 2012. He is currently an Associate Professor
+with the College of Electronic Science, NUDT. His
+research interests include computational imaging,
+image processing, compressive sensing, and sparse
+representation.
+Dr. Yang received the New Scholar Award of Chinese Ministry of Education
+in 2012, the Youth Innovation Award, and the Youth Outstanding Talent of
+NUDT in 2016.
+Wei An received the Ph.D. degree from the
+National University of Defense Technology
+(NUDT), Changsha, China, in 1999.
+She was a Senior Visiting Scholar with the
+University of Southampton, Southampton, U.K.,
+in 2016. She is currently a Professor with the College
+of Electronic Science and Technology, NUDT.
+She has authored or co-authored over 100 journals
+and conference publications. Her research interests
+include signal processing and image processing.
+Authorized licensed use limited to: SICHUAN UNIVERSITY. Downloaded on November 09,2026 at 12:47:38 UTC from IEEE Xplore.  Restrictions apply. 

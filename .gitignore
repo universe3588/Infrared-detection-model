@@ -27,3 +27,8 @@ otherlogs/
 # 数据集大文件（如被误 add）
 RDANet-main/datasets/**/images/
 RDANet-main/datasets/**/masks/
+
+# 论文独立 git 仓库 / 备份，外层不跟踪
+面向边缘部署的红外弱小目标检测可迁移压缩框架/
+面向边缘部署的红外弱小目标检测可迁移压缩框架.zip
+knockout_iou_nuaa.csv.bak
